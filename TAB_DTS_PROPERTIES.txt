@@ -1,0 +1,70 @@
+"TABLE_NAME"	"COLUMN_NAME"	"GERMAN"	"ENGLISH"	"TOOLTIP_GERMAN"	"TOOLTIP_ENGLISH"	"DIMENSION_TYPE"	"HIDDEN"	"EDITABLE"
+"TAB_DTS_PROPERTIES"	"COLUMN_NAME"	"leer"	"empty"	"Name der Spalte."	"Name of the column."	""	0	0
+"TAB_DTS_PROPERTIES"	"DIMENSION_TYPE"	"leer"	"empty"	"Dimension der Werte dieser Spalte."	"Dimension type of values of that column."	""	0	1
+"TAB_DTS_PROPERTIES"	"EDITABLE"	"leer"	"empty"	"Soll die Spalte bearbeitbar sein?"	"Shall the column be editable?"	""	0	1
+"TAB_DTS_PROPERTIES"	"ENGLISH"	"leer"	"empty"	"Name der Spalte in einer englischen Oberfläche."	"Name of the column in an english GUI."	""	0	1
+"TAB_DTS_PROPERTIES"	"GERMAN"	"leer"	"empty"	"Name der Spalte in einer deutschen Oberfläche."	"Name of the column in a german GUI."	""	0	1
+"TAB_DTS_PROPERTIES"	"HIDDEN"	"leer"	"empty"	"Soll die Spalte versteckt werden?"	"Shall the column be hidden?"	""	0	1
+"TAB_DTS_PROPERTIES"	"TABLE_NAME"	"leer"	"empty"	"Name der Tabelle."	"Name of the table."	""	0	0
+"TAB_DTS_PROPERTIES"	"TOOLTIP_ENGLISH"	"leer"	"empty"	"ToolTip in englisch."	"ToolTip in english."	""	0	1
+"TAB_DTS_PROPERTIES"	"TOOLTIP_GERMAN"	"leer"	"empty"	"ToolTip in deutsch."	"ToolTip in german."	""	0	1
+"TAB_EXPRESSION_DATA_AGE_PROPERTIES"	"AGE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGE_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGE_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGES"	"AGE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGES"	"AGE_MAX"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGES"	"AGE_MEAN"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGES"	"AGE_MEDIAN"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_AGES"	"AGE_MIN"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_BASES"	"DATA_BASE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_BASES"	"DATA_SOURCE_URL_PATTERN"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_BASES"	"URL"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_GENDER_PROPERTIES"	"GENDER"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_GENDER_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_GENDER_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_GENDERS"	"GENDER"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_GENDERS"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_HEALTH_STATE"	"HEALTH_STATE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_HEALTH_STATE"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_HEALTH_STATE_PROPERTIES"	"HEALTH_STATE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_HEALTH_STATE_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_HEALTH_STATE_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_PROPERTIES"	"DATA_SOURCE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"AGE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"DATA_BASE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"DATA_BASE_REC_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"DATA_SOURCE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"GENDER"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"HEALTH_STATE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"LAST_REFRESH_DATE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"SAMPLE_SOURCE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"TISSUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_RECORDS"	"URL"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_SAMPLE_SOURCE_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_SAMPLE_SOURCE_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_SAMPLE_SOURCE_PROPERTIES"	"SAMPLE_SOURCE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_SAMPLE_SOURCES"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_SAMPLE_SOURCES"	"SAMPLE_SOURCE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_TISSUE_PROPERTIES"	"PROPERTY"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_TISSUE_PROPERTIES"	"PROPERTY_VALUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_TISSUE_PROPERTIES"	"TISSUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_TISSUES"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_TISSUES"	"TISSUE"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_UNITS"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_UNITS"	"UNIT"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_VALUES"	"DATA_SOURCE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_VALUES"	"SAMPLE_COUNT"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_VALUES"	"TOTAL_COUNT"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_VALUES"	"UNIT"	"leer"	"empty"	""	""	""	0	1
+"TAB_EXPRESSION_DATA_VALUES"	"VARIANT_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_NAME_TYPES"	"INFORMATION"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_NAME_TYPES"	"NAME_TYPE"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_NAMES"	"GENE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_NAMES"	"GENE_NAME"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_NAMES"	"NAME_TYPE"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_VARIANTS"	"GENE_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_VARIANTS"	"VARIANT_ID"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENE_VARIANTS"	"VARIANT_NAME"	"leer"	"empty"	""	""	""	0	1
+"TAB_GENES"	"GENE_ID"	"leer"	"empty"	""	""	""	0	1
