@@ -1,4 +1,4 @@
-"TABLE_NAME"	"COLUMN_NAME"	"GERMAN"	"ENGLISH"	"TOOLTIP_GERMAN"	"TOOLTIP_ENGLISH"	"DIMENSION_TYPE"	"HIDDEN"	"EDITABLE"
+"table_name"	"column_name"	"german"	"english"	"tooltip_german"	"tooltip_english"	"dimension_type"	"hidden"	"editable"
 "TAB_DTS_PROPERTIES"	"COLUMN_NAME"	"leer"	"empty"	"Name der Spalte."	"Name of the column."	""	0	0
 "TAB_DTS_PROPERTIES"	"DIMENSION_TYPE"	"leer"	"empty"	"Dimension der Werte dieser Spalte."	"Dimension type of values of that column."	""	0	1
 "TAB_DTS_PROPERTIES"	"EDITABLE"	"leer"	"empty"	"Soll die Spalte bearbeitbar sein?"	"Shall the column be editable?"	""	0	1

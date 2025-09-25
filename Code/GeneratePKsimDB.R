@@ -13,8 +13,7 @@
 #'   ADME_ONLY     - Logical. If TRUE, only ADME genes are included. Default: TRUE.
 #'   RELEASE       - Character. Bgee release version (e.g., "15_2"). Default: "15_2".
 #'   COMPUTE_IN_RAM- Logical. If TRUE, computation is performed in RAM. Default: FALSE.
-#'   TPM_ONLY      - Logical. If TRUE, only TPM normalized data is used. Default: TRUE.
-#'   INCLUDE_RPKM  - Logical. If TRUE, RPKM values are estimated. Default: FALSE.
+#'   (INCLUDE_RPKM  - Logical. If TRUE, RPKM values are estimated. Default: FALSE.)
 #'
 #' Returns:
 #'   No return value. Writes output files to disk.
@@ -24,28 +23,26 @@
 #'
 GeneratePKsimDB <- function(
     SPECIE = "Rabbit",
-    PATH = getwd(),
+    PATH = here::here(),
     ADME_ONLY = TRUE,
     RELEASE = "15_2",
-    COMPUTE_IN_RAM = FALSE,
-    TPM_ONLY = TRUE,
-    INCLUDE_RPKM = FALSE) {
+    COMPUTE_IN_RAM = TRUE) {
   ### Dependencies ####
   switch(RELEASE,
     "13_2" = {
-      simpleError("Code was discontiniued for Bgee release 13_2, try >= 15_0")
+      simpleError("Code was discontiniued for Bgee release 13_2, try 15_2")
     },
     "14_0" = {
-      simpleError("Code was discontiniued for Bgee release 14_0, try >= 15_0")
+      simpleError("Code was discontiniued for Bgee release 14_0, try 15_2")
     },
     "14_1" = {
-      simpleError("Code was discontiniued for Bgee release 14_1, try >= 15_0")
+      simpleError("Code was discontiniued for Bgee release 14_1, try 15_2")
     },
     "14_2" = {
-      simpleError("Code was discontiniued for Bgee release 14_2, try >= 15_0")
+      simpleError("Code was discontiniued for Bgee release 14_2, try 15_2")
     },
     "15_0" = {
-      simpleMessage("Code was tested for for Bgee release 15_0")
+      simpleMessage("Code was not tested for for Bgee release 15_0")
     },
     "15_1" = {
       simpleMessage("Code was not tested for for Bgee release 15_1")
@@ -65,12 +62,7 @@ GeneratePKsimDB <- function(
   )
 
   # Test if input species is valid
-  ALL_SPECIE <- c(
-    "Mouse", "Rat", "Rabbit", "GuineaPig", "Dog", "Minipig",
-    "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed",
-    "Cattle", "Horse", "Cat", "Chicken", "Goat", "Sheep", "Turkey",
-    "Zebrafish", "Human"
-  )
+  source(paste0(PATH, "/Code/helper_Species.R"))
 
   if (!SPECIE %in% ALL_SPECIE) {
     stop(paste0(
@@ -79,12 +71,8 @@ GeneratePKsimDB <- function(
     ))
   }
 
-  # load SQL commands to set views and column types
-  source(paste0(PATH, "/Code/helper_SQL_Commands.R"))
-
-  # is needed to allow download of human data
-  # (65 GB take longer than 1 min ;-) )
-  options(timeout = 60 * 60 * 3)
+  # is needed to allow download of human data (65 GB takes some time)
+  options(timeout = 60 * 60 * 60)
 
   #### Load experimental data from bgee ####
   # listBgeeSpecies(ordering = 1)
@@ -144,7 +132,7 @@ GeneratePKsimDB <- function(
       SPECIE_LAT <- "Felis_catus"
       DATASET <- "fcatus_gene_ensembl"
     },
-    GuineaPig = {
+    Guineapig = {
       SPECIE_LAT <- "Cavia_porcellus"
       DATASET <- "cporcellus_gene_ensembl"
     },
@@ -164,13 +152,15 @@ GeneratePKsimDB <- function(
     Sheep = {
       SPECIE_LAT <- "Ovis_aries"
       DATASET <- "oaries_gene_ensembl"
-    },
-    Monkey_CrabEatingMacaque = {
-      SPECIE_LAT <- "Macaca_fascicularis"
-      DATASET <- "mfascicularis_gene_ensembl"
     }
   )
-  print("Fetch Bgee expression data sets")
+
+  print(getwd())
+  dir.create("BgeeDBs/")
+  dir.create("PK-Sim DBs/")
+  setwd("BgeeDBs/")
+  print(paste0("Fetch Bgee expression data sets for ", SPECIE))
+
   # depending on RELEASE
   if (is.na(RELEASE)) { # if specific release is desired
     bgee <- BgeeDB::Bgee$new(
@@ -194,21 +184,16 @@ GeneratePKsimDB <- function(
   if (ADME_ONLY) {
     DB_PKsim <- paste0(DB_PKsim, "_ADME_ONLY")
   }
-  if (TPM_ONLY) {
-    DB_PKsim <- paste0(DB_PKsim, "_TPM_ONLY")
-  }
   DB_PKsim <- paste0(
     DB_PKsim, "_BgeeRelease_",
-    BegeeRelease, "_", Sys.Date(), ".expressionDB"
+    BegeeRelease, ".expressionDB" # "_", Sys.Date(), ".expressionDB"
   )
-
-  PATH2PKsim <- paste0(PATH, "/", SPECIE, "/")
+  PATH2PKsim <- paste0(PATH, "/PK-Sim DBs/", SPECIE, "/")
   PATH_DB_Bgee <- bgee[["pathToData"]]
-
-  dir.create(PATH2PKsim, showWarnings = FALSE)
+  dir.create(PATH2PKsim, showWarnings = TRUE)
 
   #### Connections to local data bases ####
-  print("Build local data bases")
+  print(paste0("Connect to local ", SPECIE, " bgee data base"))
   # local bgee DB
   db_bgee_conn <-
     DBI::dbConnect(RSQLite::SQLite(),
@@ -216,18 +201,19 @@ GeneratePKsimDB <- function(
       synchronous = "off",
       cache_size = -1000
     )
-
   DB_Tables <- DBI::dbListTables(conn = db_bgee_conn)
 
   # local biomart DB
+  print(paste0("Connect to local ", SPECIE, " BioMarts"))
   db_biomart_conn <-
     DBI::dbConnect(RSQLite::SQLite(),
-      "BioMarts/All_Species_BioMarts.DB",
+      paste0(PATH, "/BioMarts/All_Species_BioMarts.DB"),
       synchronous = "off",
       cache_size = -1000
     )
 
   # local pkSim DB
+  print(paste0("Connect to local ", SPECIE, " PK-Sim DB"))
   db_PKsim_conn <- DBI::dbConnect(RSQLite::SQLite(),
     paste0(PATH2PKsim, DB_PKsim),
     synchronous = "off",
@@ -236,63 +222,18 @@ GeneratePKsimDB <- function(
 
   # If tables are empty they have been created but not filled with data
   if (rlang::is_empty(DB_Tables)) {
+    print(paste0("Build local ", SPECIE, " BgeeDB data bases"))
     # If data is not yet locally stored execute getSampleProcessedData()
     # to initiate download, currently the latest version
     # getSampleProcessedData() switched to a forced load of whole
     # db content into ram. This can cause to errors when the function
     # GeneratePKsimDB.R is called the first time, re-executing the function
     # usually resolves the issue (then DB is already downloaded).
-    if (SPECIE_LAT == "Homo_sapiens") {
-      # Access expression data table, either in local storage or as remote
-      # lazy table (connection to database). Human data is implemented to
-      # not include SRP012682 "Genotype-Tissue Expression (GTEx) Common Fund
-      # Project. single data source with > 60 GB!
-      # code can currently not process this amount of data... :-(
-      rna_seq_selected <- BgeeDB::getSampleProcessedData(bgee,
-        experimentId = # SRP058036
-          c(
-            "GSE57344", "GSE62098", "GSE43520", "GSE30352",
-            "GSE58387", "GSE58608", "GSE64283", "GSE30611"
-          )
-        # RNA-Seq experiments sorted by number of organs/tissue count 75 -> 4
-        # c("SRP012682", "ERP003613", "SRP163252", "GSE30611", "SRP043364",
-        #   "ERP109002", "ERP006650", "SRP111096", "GSE30352", "GSE64283",
-        #   "SRP058036", "SRP007359", "SRP028336", "SRP102989", "GSE43520",
-        #   "ERP120553", "SRP145002", "SRP262331", "SRP058740", "SRP136499")
-      )
-    } else {
-      rna_seq_selected <- BgeeDB::getSampleProcessedData(bgee)
-      # The default Bgee databases contain quotes causing error during later
-      # database generation, remove to reduce free disc space and for clear naming
-      DBI::dbExecute(
-        conn = db_bgee_conn,
-        statement = c("UPDATE rna_seq SET \"Anatomical.entity.name\" = REPLACE(\"Anatomical.entity.name\", '\"' , '' )")
-      )
-      DBI::dbExecute(
-        conn = db_bgee_conn,
-        statement = c("UPDATE rna_seq SET \"Stage.name\" = REPLACE(\"Stage.name\",'\"' , '' )")
-      )
-      DBI::dbExecute(
-        conn = db_bgee_conn,
-        statement = c("UPDATE rna_seq SET \"Stage.name\" = REPLACE(\"Stage.name\",' (human)' , '' )")
-      )
-      DBI::dbExecute(
-        conn = db_bgee_conn,
-        statement = c("UPDATE rna_seq SET \"Strain\" = REPLACE(\"Strain\", '\"' , '' )")
-      )
-      # (conn = db_bgee_conn, statement = c("UPDATE rna_seq SET \"Anatomical.entity.ID\" = REPLACE(\"Anatomical.entity.ID\", 'UBERON:' , '' )" )   )
-      # DBI::dbExecute(conn = db_bgee_conn, statement = c("UPDATE rna_seq SET \"Anatomical.entity.ID\" = REPLACE(\"Anatomical.entity.ID\", 'CL:' , '' )" )   )
-      # DBI::dbExecute(conn = db_bgee_conn, statement = c("UPDATE rna_seq SET \"Stage.ID\" = REPLACE(\"Stage.ID\", 'UBERON:' , '' )" )   )
-      # DBI::dbExecute(conn = db_bgee_conn, statement = c("UPDATE rna_seq SET \"Stage.ID\" = REPLACE(\"Stage.ID\", 'HsapDv:' , '' )" )   )
-      # DBI::dbExecute(conn = db_bgee_conn, statement = c("VACUUM" )   )
-      if (readr::parse_number(BegeeRelease) >= 14) {
-        # strain column only include in bgee > 14
-        DBI::dbExecute(
-          conn = db_bgee_conn,
-          statement = c("UPDATE rna_seq SET \"Strain\" = REPLACE(\"Strain\", '\"' , '' )")
-        )
-      }
-    }
+    print(paste0("Load ", SPECIE, " expression data into RAM"))
+    rna_seq_selected <- BgeeDB::getSampleProcessedData(bgee)
+    DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET "Anatomical.entity.name" = REPLACE("Anatomical.entity.name", \'"\', \'\')')
+    DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET "Stage.name" = REPLACE("Stage.name", \'"\', \'\')')
+    DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET Strain = REPLACE(Strain, \'"\', \'\')')
   }
 
   print("Re-organize data from BgeeDB for PK-Sim compatibility")
@@ -350,7 +291,7 @@ GeneratePKsimDB <- function(
 
   if (readr::parse_number(BegeeRelease) < 14) {
     rna_seq_selected <- rna_seq_selected |>
-      mutate(Sex = "UNSPECIFIED") |>
+      dplyr::mutate(Sex = "UNSPECIFIED") |>
       dplyr::mutate(Strain = SPECIE) |>
       dplyr::mutate(FPKM = NA) |>
       dplyr::mutate(TPM = NA)
@@ -366,30 +307,34 @@ GeneratePKsimDB <- function(
     gender = Sex,
     strain = Strain,
     age = Stage.name
-  ) #|> dplyr::compute()
+  )
 
   # Further format, rename and prepare data ####
   rna_seq_selected <- rna_seq_selected |>
-    dplyr::mutate(gender = tolower(gender)) |>
-    dplyr::mutate(age = tolower(age)) |>
-    dplyr::mutate(strain = tolower(strain)) |>
-    dplyr::mutate(gender = dplyr::if_else(gender == tolower("NA"),
-      tolower("UNSPECIFIED"), gender
+    dplyr::mutate(gender = toupper(gender)) |>
+    dplyr::mutate(age = toupper(age)) |>
+    dplyr::mutate(strain = toupper(strain)) |>
+    dplyr::mutate(gender = dplyr::if_else(gender == toupper("NA"),
+      toupper("UNSPECIFIED"), gender
     )) |>
-    dplyr::mutate(strain = dplyr::if_else(strain == tolower("NA"),
-      tolower("UNSPECIFIED"), strain
+    dplyr::mutate(strain = dplyr::if_else(strain == toupper("NA"),
+      toupper("UNSPECIFIED"), strain
     )) |>
-    dplyr::mutate(tissue = dplyr::if_else(tissue == tolower("NA"),
-      tolower("UNSPECIFIED"), tissue
+    dplyr::mutate(tissue = dplyr::if_else(tissue == toupper("NA"),
+      toupper("UNSPECIFIED"), tissue
     )) |>
-    dplyr::mutate(tissue = tolower(tissue)) |>
-    dplyr::mutate(state = tolower("NORMAL")) |>
-    dplyr::mutate(health_state = tolower(paste(strain, state, sep = " "))) |>
-    dplyr::compute(
-      name = "rna_seq_selected",
-      temporary = FALSE,
-      overwrite = TRUE
-    )
+    dplyr::mutate(tissue = toupper(tissue)) |>
+    dplyr::mutate(state = toupper("NORMAL")) |>
+    dplyr::mutate(health_state = toupper(paste(strain, state, sep = " ")))
+
+  if (COMPUTE_IN_RAM) {
+    rna_seq_selected <- rna_seq_selected |>
+      dplyr::compute(
+        name = "rna_seq_selected",
+        temporary = FALSE,
+        overwrite = TRUE
+      )
+  }
 
   ##### Add Gene IDs / Annotations needed for allow broad reach ####
   print("Annotete expression data with gene & protein identifiers.")
@@ -441,8 +386,8 @@ GeneratePKsimDB <- function(
   } else {
     AnnotationTable <- dplyr::tbl(db_bgee_conn, "AnnotationTable")
   }
-  # Combine expression data and annotation information
 
+  # Combine expression data and annotation information
   rna_seq_selected <- dplyr::left_join(
     AnnotationTable |>
       dplyr::select(variant_name) |>
@@ -457,7 +402,7 @@ GeneratePKsimDB <- function(
     dplyr::mutate(age = as.character(age))
 
   # Add gene IDs
-  print("Build tab_gene_variants and write to database")
+  print("Build tab_gene_variants")
   tab_gene_variants <- rna_seq_selected |>
     dplyr::select(variant_name) |>
     dplyr::distinct() |>
@@ -471,33 +416,33 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_gene_variants",
     value = data.frame(tab_gene_variants),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_gene_variants"][[1]]
   )
   # Add data source IDs
-  print("Build tab_expression_data_records_tmp and write to database")
+  print("Build tab_expression_data_records_tmp")
   tab_expression_data_records_tmp <- rna_seq_selected |>
     dplyr::select(data_base_rec_id) |>
     dplyr::distinct() |>
     dplyr::collect() |>
     dplyr::mutate(data_source_id = dplyr::row_number()) #|>
-  # dplyr::mutate(age = tolower(age))
+  # dplyr::mutate(AGE = tolower(age))
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_records_tmp",
     value = data.frame(tab_expression_data_records_tmp),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = c(data_base_rec_id = "text", data_source_id = "bigint")
   )
 
   # Add data age IDs
-  print("Build tab_expression_data_ages_tmp and write to database")
+  print("Build tab_expression_data_ages_tmp")
   tab_expression_data_ages_tmp <- rna_seq_selected |>
     dplyr::select(age) |>
     dplyr::distinct() |>
     dplyr::collect() |>
-    dplyr::mutate(age = age) |>
+    dplyr::mutate(age = toupper(age)) |>
     dplyr::mutate(age_id = dplyr::row_number()) |>
     dplyr::arrange(age_id, age) |>
     dplyr::relocate(age_id)
@@ -506,37 +451,32 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_ages_tmp",
     value = data.frame(tab_expression_data_ages_tmp),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = c(age_id = "bigint", age = "text")
   )
 
   #### Merge different expression measures (later Units in PK-Sim DB) ####
   # Here cut offs could be considered
   print("Merge expression data from multiple units.")
   tpm_table <- rna_seq_selected |>
-    dplyr::select(!tidyselect::any_of(c("FPKM", "Read.count", "RPKM"))) |> # dplyr::distinct() |>
-    # dplyr::mutate(unit = "TPM") |>
-    # dplyr::rename(sample_count = TPM) |>
-    # dplyr::filter(!is.na(sample_count)) |>
-    # filter(sample_count > CUT_OFF[["TPM"]]) |>
-    # dplyr::mutate(data_base_rec_id = paste0(data_base_rec_id, "_TPM")) |>
+    dplyr::select(!tidyselect::any_of(c("FPKM", "Read.count", "RPKM"))) |>
     dplyr::group_by(data_base_rec_id) |>
     dplyr::summarise(total_count = sum(TPM, na.rm = TRUE)) |>
     dplyr::ungroup() |>
     dplyr::collect() |>
     dplyr::mutate(total_count = total_count / 10^6)
 
-  print("Build tpm_table and write to database")
+  print("Build tpm_table")
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tpm_table",
     value = data.frame(tpm_table),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = c(data_base_rec_id = "text", total_count = "bigint")
   )
 
   ### tab_expression_data_properties #
-  print("Build tab_expression_data_properties and write to database")
+  print("Build tab_expression_data_properties")
   KEYS <- c(
     "data_source_id", "data_base", "tissue", "health_state",
     "gender", "age"
@@ -553,27 +493,34 @@ GeneratePKsimDB <- function(
       names_to = "property",
       values_to = "property_value"
     ) |>
-    dplyr::distinct()
+    dplyr::distinct() |>
+    dplyr::mutate(property = toupper(property))
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_properties",
     value = as.data.frame(tab_expression_data_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = c(data_source_id = "bigint", property = "text", property_value = "text")
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
 
+  if (COMPUTE_IN_RAM) {
+    tab_expression_data_properties <- DBI::dbReadTable(db_bgee_conn, "tab_expression_data_properties")
+  } else {
+    tab_expression_data_properties <- dplyr::tbl(db_bgee_conn, "tab_expression_data_properties")
+  }
   ### tab_expression_data_values #
-  print("Build tab_expression_data_values and write to database")
+  print("Build tab_expression_data_values")
   KEYS <- c("variant_id", "data_source_id", "sample_count", "total_count", "unit")
-  tab_expression_data_values <- dplyr::left_join(rna_seq_selected, # |> dplyr::mutate(data_base_rec_id = paste0(data_base_rec_id,"_TPM"))
+  tab_expression_data_values <- dplyr::left_join(rna_seq_selected,
     dplyr::tbl(db_bgee_conn, "tpm_table"),
     copy = TRUE
   ) |>
     dplyr::mutate(unit = "TPM") |>
     dplyr::rename(sample_count = TPM) |>
     dplyr::left_join(dplyr::tbl(db_bgee_conn, "tab_gene_variants"), copy = TRUE) |>
-    dplyr::left_join(dplyr::tbl(db_bgee_conn, "tab_expression_data_records_tmp"), copy = TRUE) |> # |> dplyr::mutate(data_base_rec_id = paste0(data_base_rec_id,"_TPM")
+    dplyr::left_join(dplyr::tbl(db_bgee_conn, "tab_expression_data_records_tmp"), copy = TRUE) |>
     dplyr::select(tidyselect::all_of(KEYS)) |>
     dplyr::arrange("variant_id", "data_source_id") |>
     dplyr::distinct() |>
@@ -583,12 +530,12 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_values",
     value = as.data.frame(tab_expression_data_values),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_values"][[1]]
   )
 
   ### tab_expression_data_age_properties #
-  print("Build tab_expression_data_age_properties and write to database")
+  print("Build tab_expression_data_age_properties")
   # optional age is extracted form the data sets, in bgee strings like "2-3 weeks old rat" are given
   tab_expression_data_age_properties <- tab_expression_data_ages_tmp |>
     dplyr::select(age_id, age) |>
@@ -596,86 +543,85 @@ GeneratePKsimDB <- function(
     tidyr::pivot_longer(!age_id,
       names_to = "property",
       values_to = "property_value"
-    )
+    ) |>
+    dplyr::mutate(property = toupper(property))
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_age_properties",
     value = as.data.frame(tab_expression_data_age_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_age_properties"][[1]]
   )
 
   ### tab_expression_data_ages #
-  print("Build tab_expression_data_ages and write to database")
+  print("Build tab_expression_data_ages")
   # for mice also Theiler Stage could be included: https://www.emouseatlas.org/emap/ema/theiler_stages/StageDefinition/stagedefinition.html#dpc
-  #  Numextract <- function(string){
-  #    unlist(regmatches(string, gregexpr("[[:digit:]]+\\.*[[:digit:]]*", string)))
-  #  }
+  # for human also Carnegie Stages could be included: https://embryology.ch/de/embryogenese/periode-embryonnaire/carnegie-stadien/
   tab_expression_data_ages <- tab_expression_data_ages_tmp |>
     dplyr::select(age_id, age) |>
     dplyr::distinct() |>
     dplyr::collect() |>
-    dplyr::mutate(age = tolower(age)) |>
+    dplyr::mutate(age = toupper(age)) |>
     dplyr::mutate(age_min = 0) |>
     dplyr::mutate(age_max = 0) |>
-    # dplyr::mutate(age_min = if_else(stringr::str_extract(string = age, pattern = tolower("^[\\d].*MONTH"), age_min / 12,
-    #                                 if_else(stringr::str_extract(string = age_min, pattern = "^[\\d].*WEEK"), age_max / 52 * -1, age_min )
-    # ) ) |>
+    dplyr::mutate(age_max = base::rowSums(tibble::tibble(
+      a = matrix(stringr::str_detect(string = age, pattern = toupper("FIRST DECADE")) * 10, ncol = 1),
+      b = matrix(stringr::str_detect(string = age, pattern = toupper("SECOND DECADE")) * 20, ncol = 1),
+      c = matrix(stringr::str_detect(string = age, pattern = toupper("THIRD DECADE")) * 30, ncol = 1),
+      d = matrix(stringr::str_detect(string = age, pattern = toupper("FOURTH DECADE")) * 40, ncol = 1),
+      e = matrix(stringr::str_detect(string = age, pattern = toupper("FIFTH DECADE")) * 50, ncol = 1),
+      f = matrix(stringr::str_detect(string = age, pattern = toupper("SIXTH DECADE")) * 60, ncol = 1),
+      g = matrix(stringr::str_detect(string = age, pattern = toupper("SEVENTH DECADE")) * 70, ncol = 1),
+      h = matrix(stringr::str_detect(string = age, pattern = toupper("EIGHTH DECADE")) * 80, ncol = 1),
+      i = matrix(stringr::str_detect(string = age, pattern = toupper("NINTH DECADE")) * 90, ncol = 1),
+      j = matrix(stringr::str_detect(string = age, pattern = toupper("TENTH DECADE")) * 100, ncol = 1)
+    ), na.rm = TRUE)) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "FIRST MONTH", replacement = "1")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "SECOND MONTH", replacement = "2")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "THIRD MONTH", replacement = "3")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "FOURTH MONTH", replacement = "4")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "FIFTH MONTH", replacement = "5")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "SIXTH MONTH", replacement = "6")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "SEVENTH MONTH", replacement = "7")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "EIGHTH MONTH", replacement = "8")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "NINTH MONTH", replacement = "9")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "DAY 12", replacement = "12 DAY")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "DAY 14", replacement = "14 DAY")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "DAY 16", replacement = "16 DAY")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "DAY 20", replacement = "20 DAY")) |>
+    dplyr::mutate(age = stringr::str_replace(string = age, pattern = "DAY 21", replacement = "21 DAY"))
+
+  tab_expression_data_ages <- tab_expression_data_ages |>
+    dplyr::mutate(age_min = base::rowSums(tibble::tibble(
+      a = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = ("^[\\d].*DAY"))) / 365, ncol = 1),
+      b = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = ("^[\\d].*WEEK"))) / 52, ncol = 1),
+      c = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = ("^[\\d].*MONTH"))) / 12, ncol = 1),
+      d = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = ("^[\\d].*YEAR"))), ncol = 1)
+    ), na.rm = TRUE))
+  tab_expression_data_ages <- tab_expression_data_ages |>
     dplyr::mutate(age_median = 0) |>
     dplyr::mutate(age_mean = 0) |>
-    # dplyr::mutate(age_min = base::rowSums(tibble::tibble(
-    #   a = matrix(stringr::str_detect(string = age, pattern = tolower("FIRST DECADE")) * 0, ncol = 1),
-    #   b = matrix(stringr::str_detect(string = age, pattern = tolower("SECOND DECADE")) * 11, ncol = 1),
-    #   c = matrix(stringr::str_detect(string = age, pattern = tolower("THIRD DECADE")) * 20, ncol = 1),
-    #   d = matrix(stringr::str_detect(string = age, pattern = tolower("FOURTH DECADE")) * 30, ncol = 1),
-    #   e = matrix(stringr::str_detect(string = age, pattern = tolower("FIFTH DECADE")) * 40, ncol = 1),
-    #   f = matrix(stringr::str_detect(string = age, pattern = tolower("SIXTH DECADE")) * 50, ncol = 1),
-    #   g = matrix(stringr::str_detect(string = age, pattern = tolower("SEVENTH DECADE")) * 60, ncol = 1),
-    #   h = matrix(stringr::str_detect(string = age, pattern = tolower("EIGHTH DECADE")) * 70, ncol = 1),
-    #   i = matrix(stringr::str_detect(string = age, pattern = tolower("NINTH DECADE")) * 80, ncol = 1),
-    #   j = matrix(stringr::str_detect(string = age, pattern = tolower("TENTH DECADE")) * 90, ncol = 1)
-    # ), na.rm = TRUE)) |>
-    dplyr::mutate(age_max = base::rowSums(tibble::tibble(
-      a = matrix(stringr::str_detect(string = age, pattern = tolower("FIRST DECADE")) * 10, ncol = 1),
-      b = matrix(stringr::str_detect(string = age, pattern = tolower("SECOND DECADE")) * 20, ncol = 1),
-      c = matrix(stringr::str_detect(string = age, pattern = tolower("THIRD DECADE")) * 30, ncol = 1),
-      d = matrix(stringr::str_detect(string = age, pattern = tolower("FOURTH DECADE")) * 40, ncol = 1),
-      e = matrix(stringr::str_detect(string = age, pattern = tolower("FIFTH DECADE")) * 50, ncol = 1),
-      f = matrix(stringr::str_detect(string = age, pattern = tolower("SIXTH DECADE")) * 60, ncol = 1),
-      g = matrix(stringr::str_detect(string = age, pattern = tolower("SEVENTH DECADE")) * 70, ncol = 1),
-      h = matrix(stringr::str_detect(string = age, pattern = tolower("EIGHTH DECADE")) * 80, ncol = 1),
-      i = matrix(stringr::str_detect(string = age, pattern = tolower("NINTH DECADE")) * 90, ncol = 1),
-      j = matrix(stringr::str_detect(string = age, pattern = tolower("TENTH DECADE")) * 100, ncol = 1)
-    ), na.rm = TRUE)) |>
-    dplyr::mutate(age_min = base::rowSums(tibble::tibble(
-      a = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = tolower("^[\\d].*DAY"))) / 365, ncol = 1),
-      b = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = tolower("^[\\d].*WEEK"))) / 52, ncol = 1),
-      c = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = tolower("^[\\d].*MONTH"))) / 12, ncol = 1),
-      d = matrix(readr::parse_number(stringr::str_extract(string = age, pattern = tolower("^[\\d].*YEAR"))), ncol = 1)
-    ), na.rm = TRUE)) |>
-    dplyr::mutate(age_max = dplyr::if_else(!(stringr::str_detect(string = age, pattern = tolower("DECADE"))), age_min, age_max)) |>
-    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("FERTILIZATION")), age_min * -1, age_min)) |>
-    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("FERTILIZATION")), age_max * -1, age_max)) |>
-    # dplyr::mutate(age_median = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("FERTILIZATION")), age_median * -1, age_median)) |>
-    dplyr::mutate(age_mean = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("FERTILIZATION")), age_mean * -1, age_mean)) |>
-    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("DECADE")), age_max - 10, age_min)) |>
-    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("DECADE")), age_max - 1, age_max)) |>
-    # dplyr::mutate(age_median = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("DECADE")), (age_max - age_min) / 2 + age_min, age_median)) |>
-    dplyr::mutate(age_mean = dplyr::if_else(stringr::str_detect(string = age, pattern = tolower("DECADE")), (age_max + age_min) / 2, age_mean))
-  # dplyr::mutate(age_max = dplyr::if_else(!(stringr::str_detect(string = age, pattern = tolower("FERTILIZATION"))), age_min, age_max)
-  # dplyr::mutate(age_median = dplyr::if_else(age_median == 0, age_mean, age_median))
+    dplyr::mutate(age_max = dplyr::if_else(!(stringr::str_detect(string = age, pattern = toupper("DECADE"))), age_min, age_max)) |>
+    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("FERTILIZATION")), -9 / 12 + age_min, age_min)) |>
+    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("FERTILIZATION")), -9 / 12 + age_max, age_max)) |>
+    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("GESTATION")), -9 / 12 + age_min, age_min)) |>
+    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("GESTATION")), -9 / 12 + age_max, age_max)) |>
+    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("EMBRYO")), -9 / 12 + age_min, age_min)) |>
+    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("EMBRYO")), -9 / 12 + age_max, age_max)) |>
+    dplyr::mutate(age_min = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("DECADE")), age_max - 10, age_min)) |>
+    dplyr::mutate(age_max = dplyr::if_else(stringr::str_detect(string = age, pattern = toupper("DECADE")), age_max - 1, age_max))
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_ages",
     value = as.data.frame(tab_expression_data_ages),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_ages"][[1]]
   )
 
   ### tab_expression_data_bases #
-  print("Build tab_expression_data_bases and write to database")
+  print("Build tab_expression_data_bases")
   annotation_bgee <- BgeeDB::getAnnotation(bgee)
   DataAnnotation <- tibble::as_tibble(unique(annotation_bgee[[2]][, c("Experiment.ID", "Data.source.URL")]))
   DataAnnotation <- DataAnnotation |>
@@ -691,7 +637,6 @@ GeneratePKsimDB <- function(
       conn = db_bgee_conn,
       name = "DataAnnotation",
       value = data.frame(DataAnnotation),
-      tab_expression_data_bases = TRUE,
       overwrite = TRUE
     )
     DataAnnotation <- dplyr::tbl(db_bgee_conn, "DataAnnotation")
@@ -703,12 +648,12 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_bases",
     value = as.data.frame(tab_expression_data_bases),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_bases"][[1]]
   )
 
   ### tab_expression_data_gender_properties #
-  print("Build tab_expression_data_gender_properties and write to database")
+  print("Build tab_expression_data_gender_properties")
   tab_expression_data_gender_properties <- rna_seq_selected |>
     dplyr::select(gender, age, tissue) |>
     dplyr::distinct() |>
@@ -717,18 +662,20 @@ GeneratePKsimDB <- function(
       names_to = "property",
       values_to = "property_value"
     ) |>
+    dplyr::mutate(property = toupper(property)) |>
     dplyr::distinct()
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_gender_properties",
     value = as.data.frame(tab_expression_data_gender_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_gender_properties"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_gender_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
 
   ### tab_expression_data_genders #
-  print("Build tab_expression_data_genders and write to database")
+  print("Build tab_expression_data_genders")
   tab_expression_data_genders <- rna_seq_selected |>
     dplyr::select(gender) |>
     dplyr::distinct() |>
@@ -738,43 +685,47 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_genders",
     value = as.data.frame(tab_expression_data_genders),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_genders"][[1]]
   )
 
   ### tab_expression_data_health_state #
-  print("Build tab_expression_data_health_state and write to database")
+  print("Build tab_expression_data_health_state")
   tab_expression_data_health_state <- rna_seq_selected |>
     dplyr::select(health_state) |>
     dplyr::distinct() |>
-    dplyr::mutate(information = paste("This refers to from an ", health_state, " individual.", sep = ""))
+    dplyr::mutate(information = paste("This refers to data from '", health_state, "' individual.", sep = ""))
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_health_state",
     value = as.data.frame(tab_expression_data_health_state),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_health_state"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_health_state SET health_state = REPLACE(health_state, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_health_state SET information = REPLACE(information, \'"\', \'\')')
 
   ### tab_expression_data_health_state_properties #
-  print("Build tab_expression_data_health_state_properties and write to database")
+  print("Build tab_expression_data_health_state_properties")
   tab_expression_data_health_state_properties <- rna_seq_selected |>
     dplyr::select(health_state) |>
     dplyr::distinct() |>
-    dplyr::mutate(property = "health_state") |>
+    dplyr::mutate(property = "HEALTH_STATE") |>
     dplyr::mutate(property_value = health_state)
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_expression_data_health_state_properties",
     value = as.data.frame(tab_expression_data_health_state_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_health_state_properties"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_health_state_properties SET health_state = REPLACE(health_state, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_health_state_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
 
   ### tab_expression_data_records #
-  print("Build tab_expression_data_records and write to database")
+  print("Build tab_expression_data_records")
   KEYS <- c(
     "data_source_id", "data_base_rec_id", "tissue", "health_state",
     "gender", "age_id"
@@ -808,29 +759,36 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_records",
     value = as.data.frame(tab_expression_data_records),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_records"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_records SET tissue = REPLACE(tissue, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_records SET health_state = REPLACE(health_state, \'"\', \'\')')
+
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_age_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_ages_tmp SET age = REPLACE(age, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_ages SET age = REPLACE(age, \'"\', \'\')')
 
   ### tab_expression_data_sample_source_properties #
-  print("Build tab_expression_data_sample_source_properties and write to database")
+  print("Build tab_expression_data_sample_source_properties")
   tab_expression_data_sample_source_properties <- rna_seq_selected |>
     dplyr::select(tissue) |>
     dplyr::distinct() |>
     dplyr::rename(property_value = tissue) |>
-    dplyr::mutate(property = "tissue_SOURCE") |>
-    dplyr::mutate(sample_source = "tissue") |>
+    dplyr::mutate(property = "TISSUE_SOURCE") |>
+    dplyr::mutate(sample_source = "TISSUE") |>
     dplyr::arrange(property_value)
 
   DBI::dbWriteTable(
     conn = db_bgee_conn, name = "tab_expression_data_sample_source_properties",
     value = as.data.frame(tab_expression_data_sample_source_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_sample_source_properties"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_sample_source_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
 
   ### tab_expression_data_sample_sources #
-  print("Build tab_expression_data_sample_sources and write to database")
+  print("Build tab_expression_data_sample_sources")
   tab_expression_data_sample_sources <-
     tibble::tibble(
       sample_source = c("CELL LINE", "PRIMARY CULTURE", "TISSUE", "UNSPECIFIED"),
@@ -845,28 +803,30 @@ GeneratePKsimDB <- function(
   DBI::dbWriteTable(
     conn = db_bgee_conn, name = "tab_expression_data_sample_sources",
     value = as.data.frame(tab_expression_data_sample_sources),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_sample_sources"][[1]]
   )
 
   ### tab_expression_data_tissue_properties #
-  print("Build tab_expression_data_tissue_properties and write to database")
+  print("Build tab_expression_data_tissue_properties")
   tab_expression_data_tissue_properties <- rna_seq_selected |>
     dplyr::select(tissue) |>
     dplyr::distinct() |>
     dplyr::mutate(property_value = tissue) |>
-    dplyr::mutate(property = "tissue") |>
+    dplyr::mutate(property = "TISSUE") |>
     dplyr::arrange(property_value)
 
   DBI::dbWriteTable(
     conn = db_bgee_conn, name = "tab_expression_data_tissue_properties",
     value = as.data.frame(tab_expression_data_tissue_properties),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_tissue_properties"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_tissue_properties SET property_value = REPLACE(property_value, \'"\', \'\')')
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_tissue_properties SET tissue = REPLACE(tissue, \'"\', \'\')')
 
   ### tab_expression_data_tissues #
-  print("Build tab_expression_data_tissues and write to database")
+  print("Build tab_expression_data_tissues")
   tab_expression_data_tissues <- rna_seq_selected |>
     dplyr::select(tissue) |>
     dplyr::distinct() |>
@@ -876,12 +836,13 @@ GeneratePKsimDB <- function(
   DBI::dbWriteTable(
     conn = db_bgee_conn, name = "tab_expression_data_tissues",
     value = as.data.frame(tab_expression_data_tissues),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_tissues"][[1]]
   )
+  DBI::dbExecute(db_bgee_conn, 'UPDATE tab_expression_data_tissues SET tissue = REPLACE(tissue, \'"\', \'\')')
 
   ### tab_expression_data_units #
-  print("Build tab_expression_data_units and write to database")
+  print("Build tab_expression_data_units")
   # tab_expression_data_units <-
   #     tab_expression_data_values |>
   #     dplyr::select(unit) |>
@@ -901,12 +862,12 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_expression_data_units",
     value = as.data.frame(tab_expression_data_units),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_expression_data_units"][[1]]
   )
 
   ### tab_gene_names #
-  print("Build tab_gene_names and write to database")
+  print("Build tab_gene_names")
   # linking the unique variant ID to the different identifier
   KEYS <- c(
     "variant_id", "variant_name", "symbol", "official_full_name",
@@ -923,7 +884,7 @@ GeneratePKsimDB <- function(
     dplyr::distinct() |>
     dplyr::rename(gene_id = entrezid) |>
     dplyr::mutate(gene_id = as.character(gene_id)) |>
-    dplyr::distinct() 
+    dplyr::distinct()
 
   tab_gene_names <- tab_gene_names |>
     tidyr::pivot_longer(!variant_id,
@@ -933,18 +894,19 @@ GeneratePKsimDB <- function(
     dplyr::filter(gene_name != "") |>
     dplyr::rename(gene_id = variant_id) |>
     dplyr::distinct() |>
+    dplyr::mutate(name_type = toupper(name_type)) |>
     dplyr::arrange(gene_id)
 
   DBI::dbWriteTable(
     conn = db_bgee_conn,
     name = "tab_gene_names",
     value = as.data.frame(tab_gene_names),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_gene_names"][[1]]
   )
 
   ### tab_gene_name_types #
-  print("Build tab_gene_name_types and write to database")
+  print("Build tab_gene_name_types")
   tab_gene_name_types <- tab_gene_names |>
     dplyr::select(name_type) |>
     dplyr::distinct() |>
@@ -955,14 +917,14 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_gene_name_types",
     value = as.data.frame(tab_gene_name_types),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_gene_name_types"][[1]]
   )
 
   ### tab_gene_variants #
 
   ### tab_genes #
-  print("Build tab_genes and write to database")
+  print("Build tab_genes")
   tab_genes <- tab_gene_variants |>
     dplyr::select(gene_id) |>
     dplyr::distinct()
@@ -971,12 +933,12 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_genes",
     value = as.data.frame(tab_genes),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_genes"][[1]]
   )
 
   ### tab_global_statistics #
-  print("Build tab_global_statistics and write to database")
+  print("Build tab_global_statistics")
   # function in original Access DB == avg: 10^mean(Logarithmus([sample_count]/[total_count])/Logarithmus(10))
   tab_global_statistics <- tab_expression_data_values |>
     dplyr::select(unit, sample_count, total_count) |>
@@ -984,7 +946,7 @@ GeneratePKsimDB <- function(
     dplyr::mutate(avg = dplyr::if_else(condition = unit %in% c("RPKM", "FPKM"),
       true = 10^mean(log(sample_count / total_count) / log(10), na.rm = TRUE),
       false = 10^mean(log(sample_count) / log(10), na.rm = TRUE)
-      #false = geometric_mean(sample_count, na.rm = TRUE)
+      # false = geometric_mean(sample_count, na.rm = TRUE)
     )) |>
     dplyr::select(unit, avg) |>
     dplyr::distinct()
@@ -993,98 +955,100 @@ GeneratePKsimDB <- function(
     conn = db_bgee_conn,
     name = "tab_global_statistics",
     value = as.data.frame(tab_global_statistics),
-    tab_expression_data_bases = TRUE,
-    overwrite = TRUE
+    overwrite = TRUE,
+    field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == "tab_global_statistics"][[1]]
   )
 
   ##### Write data into PK-Sim expression database #####
-  print("Write data into PK-Sim expression database")
+  print(paste0("Write '", SPECIE, "' data into PK-Sim expression database"))
   assign(
     x = "tab_container_tissue",
-    value = tibble::tibble(read.table("Code/tab_container_tissue.txt",
-      header = 1, sep = "\t"
+    value = tibble::tibble(read.table(paste0(PATH, "/Code/tab_container_tissue.txt"),
+      header = 1, sep = "\t", quote = '"'
     ))
   )
   assign(
     x = "tab_dts_properties",
-    value = tibble::tibble(read.table("Code/tab_dts_properties.txt",
+    value = tibble::tibble(read.table(paste0(PATH, "/Code/tab_dts_properties.txt"),
       header = 1, sep = "\t"
     ))
   )
-  colnames(tab_dts_properties) <- colnames(tab_dts_properties) |> tolower()
-  Files <- ls(pattern = "^tab_.{4}")
-  Files <- Files[-c(grep(x = Files, pattern = "_tmp"))]
+  #  tab_dts_properties <- tab_dts_properties |>
+  #  dplyr::mutate(table_name = tolower(table_name),
+  #                column_name = tolower(column_name))
+  # Files <- ls(pattern = "^tab_.{4}")
+  # Files <- Files[-c(grep(x = Files, pattern = "_tmp"))]
   # Files <- Files[-c(grep(x = Files, pattern = "_TMP"))]
   # Files <- DBI::dbListTables(db_bgee_conn)
   # Files <- Files[grep(x = Files, pattern = "^TAB_.{4}")]
 
   # Connect to SQLite db
   DB_Tables <- DBI::dbListTables(db_PKsim_conn)
+  DB_Object <- DBI::dbListObjects(db_PKsim_conn)
 
-  # Remove old tables
-  for (TAB in DB_Tables) {
-    base::ifelse(rlang::is_empty(base::grep("QRY", TAB)),
-      DBI::dbRemoveTable(db_PKsim_conn, TAB),
-      DBI::dbExecute(conn = db_PKsim_conn, paste0("DROP VIEW ", TAB, ";"))
-    )
+  # Remove old views
+  for (view in names(VIEW_TABLE)) {
+    # DBI::dbExecute(conn = db_PKsim_conn, paste0("DROP VIEW ", toupper(view), ";"))
+    DBI::dbExecute(conn = db_PKsim_conn, paste0("DROP VIEW IF EXISTS ", view, ";"))
+  }
+  # Remove index
+  for (tab in CREATE_TABLE$TAB) {
+    DBI::dbExecute(conn = db_PKsim_conn, paste0("DROP INDEX IF EXISTS ", tab, ";"))
+  }
+  # Remove tables
+  for (tab in CREATE_TABLE$TAB) {
+    DBI::dbExecute(conn = db_PKsim_conn, paste0("DROP TABLE IF EXISTS ", tab, ";"))
   }
 
   # Add empty tables SQLite data base.
-  CREATE_TABLE_COMMAND <- CREATE_TABLE$COMMAND
-  for (i in 1:length(CREATE_TABLE_COMMAND)) {
-    DBI::dbExecute(conn = db_PKsim_conn, CREATE_TABLE_COMMAND[i])
+  for (command in CREATE_TABLE$COMMAND) {
+    DBI::dbExecute(conn = db_PKsim_conn, command)
   }
 
   # Load modified tab files and write to db
-  for (i in 1:length(Files)) {
-    TAB <- Files[i]
+  for (tab in CREATE_TABLE$TAB) {
     # info output to screen
-    print(paste0("Write \'", tolower(TAB), "\' to \'", SPECIE, "\' PK-Sim expression database"))
-    tmp_table_names <- TYPE[[which(TAB_s %in% tolower(TAB))]]
+    print(paste0("Write \'", tolower(tab), "\' to \'", SPECIE, "\' PK-Sim expression database"))
 
-    if (sum(TAB == c("tab_container_tissue", "tab_dts_properties")) == 1) {
-      names(tmp_table_names) <- colnames(get(TAB))
+    if (sum(tab == c("tab_container_tissue", "tab_dts_properties")) == 1) {
       DBI::dbWriteTable(
         conn = db_PKsim_conn,
-        name = tolower(TAB),
-        value = get(TAB),
+        name = tolower(tab),
+        value = get(tab),
         row.names = FALSE,
-        tab_expression_data_bases = TRUE,
-        append = TRUE
-        # field.types = tmp_table_names
+        append = TRUE # ,
+        # overwrite = FALSE,
+        # field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == tab][[1]]
       )
     } else {
-      TMP <- dplyr::tbl(db_bgee_conn, TAB)
-      names(tmp_table_names) <- colnames(TMP)
-
+      TMP <- dplyr::tbl(db_bgee_conn, tab)
       DBI::dbWriteTable(
         conn = db_PKsim_conn,
-        name = tolower(TAB),
+        name = tolower(tab),
         value = data.frame(TMP) |> dplyr::collect(),
         row.names = FALSE,
-        tab_expression_data_bases = TRUE,
-        append = TRUE
-        # field.types = tmp_table_names
+        append = TRUE # ,
+        # overwrite = FALSE,
+        # field.types = CREATE_TABLE$TYPE[CREATE_TABLE$TAB == tab][[1]]
       )
     }
   }
 
-  for (i in 1:length(VIEW)) { # if error occurs generate DB and show warning
-    DBI::dbExecute(db_PKsim_conn, VIEW[i])
+  print(paste0("Create views for '", SPECIE, "\' PK-Sim expression database"))
+  for (view in names(VIEW_TABLE)) {
+    DBI::dbExecute(db_PKsim_conn, VIEW_TABLE[[view]])
   }
 
+  print(paste0("Set table indizes for '", SPECIE, "\' PK-Sim expression database"))
   for (i in 1:length(INDIZES)) { # if error occurs generate DB and show warning
     DBI::dbExecute(db_PKsim_conn, INDIZES[i])
   }
 
-  # CREATE_TABLE$ALTER_COMMAND
-  # for (i in 1:length(CREATE_TABLE$ALTER_COMMAND)) { # if error occurs generate DB and show warning
-  #   DBI::dbExecute(db_PKsim_conn, CREATE_TABLE$ALTER_COMMAND[i])
-  # }
-  print("Compress PK-Sim expression database")
+  print(paste0("Compress '", SPECIE, "' PK-Sim expression database"))
   DBI::dbExecute(conn = db_PKsim_conn, statement = "VACUUM") # clears pre-allocated disc space for db
-  DBI::dbExecute(conn = db_bgee_conn, statement = "VACUUM")
+  DBI::dbDisconnect(db_biomart_conn)
   DBI::dbDisconnect(db_PKsim_conn)
   DBI::dbDisconnect(db_bgee_conn)
   gc() # clears used memory
+  setwd(here::here())
 }

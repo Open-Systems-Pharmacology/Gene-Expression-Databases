@@ -1,3 +1,8 @@
+# VSCode files
+node_modules*
+.vscode
+*.json
+
 # History files
 .Rhistory
 .Rapp.history
@@ -13,7 +18,8 @@
 *-Ex.R
 
 # Output files from R CMD build
-/*.tar.gz
+**.tar.gz
+**/PK-Sim DBs/**/**/*.tar.gz
 
 # Output files from R CMD check
 /*.Rcheck/
@@ -30,6 +36,10 @@
 
 # local expression data files
 *Bgee_*/*
+**/BgeeDBs/**/*.tsv
 
-# local BioMarts
-BioMarts/
+# local non compressed DBs
+*.DB
+*.db
+*.expressionDB
+*.expressionDb

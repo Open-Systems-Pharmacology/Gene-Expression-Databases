@@ -1,3 +1,10 @@
+# Suppress dplyr global variable binding warnings
+utils::globalVariables(c(
+  "ensembl_gene_id", "entrezgene_id", "external_gene_name", "uniprot_gn_symbol", "description", "external_synonym", "wikigene_name",
+  "hsapiens_homolog_associated_gene_name", "hsapiens_homolog_ensembl_gene", "hsapiens_homolog_perc_id_r1",
+  "VARIANT_NAME", "ENTREZID", "PREFFERED_NAME", "SYMBOL", "OFFICIAL_FULL_NAME", "SYNONYM", "OTHER_NAME",
+  "HOMOLOG_SYMBOL", "HOMOLOG", "HOMOLOGY_PERCENT"
+))
 #' PrepareBioMarts
 #'
 #' Description:
@@ -44,20 +51,20 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
   #  3. http://www.membranetransport.org/
   #  4. http://www.tcdb.org/
   #
-  # List of available species:
-  # ensembl <- useMart("ensembl")
-  # ListofEnsemblSpecies <- listDatasets(ensembl)
   #
   # Notably Sheep homologous genes are not available from oaries_gene_ensembl
   # Alternative homology mappings via: OMA # https://bioconductor.org/packages/release/bioc/html/OmaDB.html
   #### Preparations ####
   # adding the various identifier and information is extremely memory
   # intensive and might only work with a 64-bit R version!
-  ALL_SPECIE <- c(
-    "Human", "Monkey_mulatta", "Minipig", "Dog", "Mouse", "Rat", "Rabbit",
-    "Zebrafish", "Cattle", "Horse", "Cat", "GuineaPig", "Chicken",
-    "Goat", "Sheep", "Turkey", "Monkey_fascicularis", "Monkey_PigTailed"
-  )
+  source(paste0(PATH, "/Code/helper_Species.R"))
+  # ALL_SPECIE <- c(
+  #    "Mouse", "Rat", "Rabbit", "Guineapig", "Dog", "Minipig",
+  #    "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed",
+  #    "Cattle", "Horse", "Cat", "Chicken", "Goat", "Sheep", "Turkey",
+  #    "Zebrafish", "Human"
+  # )
+
   if (!SPECIE %in% ALL_SPECIE) {
     stop(paste0(
       "Given SPECIE: '",
@@ -74,41 +81,71 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     paste0("./BioMarts/All_Species_BioMarts.DB"),
     synchronous = NULL
   )
-  if (!DBI::dbExistsTable(conn = Conn, name = "Human_ADME") & SPECIE != "Human") {
+  if (!DBI::dbExistsTable(conn = Conn, name = "Human_ADME") && SPECIE != "Human") {
     print(paste0("Human annotation do not exist in 'All_Species_BioMarts.DB' \n Human data is loaded first."))
-    PrepareMarts("Human")
+    PrepareBioMarts("Human")
   }
 
   #### Load biomaRt data and store ####
   print(paste0("Loading ", SPECIE, " gene inforamtion from biomart mirror."))
-
+  # List of available species:
+  # ensembl <- biomaRt::useMart("ensembl")
+  # ListOfEnsemblSpecies <- biomaRt::listDatasets(ensembl)
+  # ListOfEnsemblArchives <- biomaRt::listEnsemblArchives()
+  #
   switch(SPECIE,
-    # Updates in Ensembl reference genomes can cause  mismatches between
-    # organism Bgee Ensembl ID and reference IDs Ensembl IDs from biomaRt,
-    # fix is for previous ensembl versions for specific species
-    Human = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    Cat = {
+      ensembl <- biomaRt::useMart("ensembl",
+        dataset = "fcatus_gene_ensembl",
+        host = "https://may2021.archive.ensembl.org"
+      )
     },
-    Monkey_mulatta = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mmulatta_gene_ensembl")
+    Cattle = {
+      ensembl <- biomaRt::useMart("ensembl",
+        dataset = "btaurus_gene_ensembl",
+        host = "https://may2021.archive.ensembl.org"
+      )
     },
-    Monkey_fascicularis = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mfascicularis_gene_ensembl")
+    Chicken = {
+      ensembl <- biomaRt::useMart("ensembl",
+        dataset = "ggallus_gene_ensembl",
+        host = "https://apr2022.archive.ensembl.org"
+      )
     },
-    Monkey_PigTailed = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mnemestrina_gene_ensembl")
-    },
-    Minipig = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "sscrofa_gene_ensembl")
-    },
-    Dog = { # naming error in previous biomart version can cause error --> fix is to use previous assembly version
+    Dog = {
       ensembl <- biomaRt::useMart("ensembl",
         dataset = "clfamiliaris_gene_ensembl",
         host = "https://may2021.archive.ensembl.org"
       )
     },
-    Rat = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "rnorvegicus_gene_ensembl")
+    Goat = {
+      ensembl <- biomaRt::useMart("ensembl",
+        dataset = "chircus_gene_ensembl"
+      )
+    },
+    Guineapig = {
+      ensembl <- biomaRt::useMart("ensembl",
+        dataset = "cporcellus_gene_ensembl",
+        host = "https://may2025.archive.ensembl.org"
+      )
+    },
+    Horse = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "ecaballus_gene_ensembl")
+    },
+    Human = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+    },
+    Minipig = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "sscrofa_gene_ensembl")
+    },
+    Monkey_fascicularis = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "mfascicularis_gene_ensembl")
+    },
+    Monkey_mulatta = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "mmulatta_gene_ensembl")
+    },
+    Monkey_PigTailed = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "mnemestrina_gene_ensembl")
     },
     Mouse = {
       ensembl <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
@@ -116,47 +153,17 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     Rabbit = {
       ensembl <- biomaRt::useMart("ensembl", dataset = "ocuniculus_gene_ensembl")
     },
+    Rat = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "rnorvegicus_gene_ensembl")
+    },
+    Sheep = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "oaries_gene_ensembl")
+    },
+    Turkey = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "mgallopavo_gene_ensembl")
+    },
     Zebrafish = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "drerio_gene_ensembl")
-    },
-    Cattle = { #
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "btaurus_gene_ensembl" # ,
-        # host = "https://apr2022.archive.ensembl.org"
-      )
-    },
-    Horse = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "ecaballus_gene_ensembl")
-    },
-    Cat = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "fcatus_gene_ensembl")
-    },
-    GuineaPig = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "cporcellus_gene_ensembl")
-    },
-    Chicken = { #
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "ggallus_gene_ensembl" # ,
-        # host = "https://apr2022.archive.ensembl.org"
-      )
-    },
-    Turkey = { #
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "mgallopavo_gene_ensembl" # ,
-        # host = "https://apr2022.archive.ensembl.org"
-      )
-    },
-    Goat = { #
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "chircus_gene_ensembl" # ,
-        # host = "https://apr2022.archive.ensembl.org"
-      )
-    },
-    Sheep = { #
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "oaries_gene_ensembl" # ,
-        # host = "https://apr2022.archive.ensembl.org"
-      )
+      ensembl <- biomaRt::useMart("ensembl", dataset = "drerio_gene_ensembl", host = "https://oct2024.archive.ensembl.org")
     }
   )
 
@@ -169,6 +176,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     "external_synonym", "external_gene_name", "wikigene_name",
     "uniprot_gn_symbol"
   ), mart = ensembl) # hgnc_symbol
+
   # Add SPECIE specific gene lengths and map human ortholog onto animal genes
   SPECIE_ANNOTATION <- dplyr::left_join(SPECIE_ANNOTATION,
     biomaRt::getBM(
@@ -189,7 +197,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
       OTHER_NAME = wikigene_name
     )
 
-  if (SPECIE != "Human" & SPECIE != "Sheep") {
+  if (SPECIE != "Human" && SPECIE != "Sheep") {
     print(paste0("Link ", SPECIE, " gene identifiers to human orthologs based on ensembl IDs."))
     SPECIE_ANNOTATION <- dplyr::left_join(SPECIE_ANNOTATION,
       biomaRt::getBM(
@@ -241,7 +249,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
   )
 
   # Select only ADME genes
-  if (SPECIE != "Human" & SPECIE != "Sheep") {
+  if (SPECIE != "Human" && SPECIE != "Sheep") {
     SPECIE_ANNOTATION <- SPECIE_ANNOTATION |>
       dplyr::filter(grepl(paste(ADMEgene, collapse = "|"), SYNONYM) |
         grepl(paste(ADMEgene, collapse = "|"), SYMBOL) |

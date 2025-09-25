@@ -2,14 +2,15 @@
 ## This information is needed to map the organ information from data source to the
 ## PK-Sim internal organ compartment nomenclature (found in TAB_CONTAINER_TISSUE.txt)
 ## If names are not matched the expression data can not be linked to the PK-Sim organ compartment!
-
-ALL_SPECIE <- c(
-  "Dog", "Mouse", "Rat", "Rabbit", "Monkey", "Minipig",
-  "Zebrafish", "Cattle", "Horse", "Cat", "GuineaPig",
-  "Chicken", "Human"
-)
-
-Organs <- tibble()
+source(paste0(PATH, "/Code/helper_Species.R"))
+# ALL_SPECIE <- c(
+#  "Dog", "Mouse", "Rat", "Rabbit", "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed", "Minipig",
+#  "Zebrafish", "Cattle", "Horse", "Cat", "GuineaPig", "Chicken", "Sheep", "Goat", "Human"
+# )
+ALL_SPECIE <- c("Human", PharmaSpecies, AnimalHealthSpecies)
+dir.create("BgeeDBs")
+setwd("BgeeDBs/")
+Organs <- tibble::tibble()
 Ages <- Organs
 
 for (SPECIE in ALL_SPECIE) {
@@ -89,14 +90,10 @@ for (SPECIE in ALL_SPECIE) {
     Sheep = {
       SPECIE_LAT <- "Ovis_aries"
       DATASET <- "oaries_gene_ensembl"
-    }, # oarambouillet_gene_ensembl
-    Monkey_CrabEatingMacaque = {
-      SPECIE_LAT <- "Macaca_fascicularis"
-      DATASET <- "mfascicularis_gene_ensembl"
-    }
+    } # oarambouillet_gene_ensembl
   )
   # listBgeeSpecies(release = "14.1")
-  bgee <- Bgee$new(
+  bgee <- BgeeDB::Bgee$new(
     species = SPECIE_LAT,
     dataType = "rna_seq"
   ) # "affymetrix", "est", "in_situ"
@@ -106,32 +103,38 @@ for (SPECIE in ALL_SPECIE) {
 
   annotation_bgee <- BgeeDB::getAnnotation(bgee)
   TMP1 <- tibble::tibble(annotation_bgee[[1]]) |>
-    dplyr::select(Anatomical.entity.name, Anatomical.entity.ID) |>
-    dplyr::distinct()
+    dplyr::select(Anatomical.entity.name, Anatomical.entity.ID)
 
   TMP2 <- tibble::tibble(annotation_bgee[[1]]) |>
-    dplyr::select(Stage.name, Stage.ID) |>
-    dplyr::distinct()
+    dplyr::select(Stage.name, Stage.ID)
   # TMP <- as.data.table(unique(annotation_bgee[[1]]))#[, c("Anatomical.entity.ID","Anatomical.entity.name","Stage.ID","Stage.name")]))
   # TMP[, Specie := as.factor(SPECIE)]
   # unique(annotation_bgee[[2]][, c("Experiment.ID","Experiment.name","Data.source.URL")])
-  Organs <- rbind(Organs, TMP1)
-  Ages <- rbind(Ages, TMP2)
+  Organs <- rbind(Organs, TMP1) |>
+    dplyr::distinct()
+  Ages <- rbind(Ages, TMP2) |>
+    dplyr::distinct()
 }
 # write.table(sort(toupper(unique(Organs[, c("Anatomical.entity.ID","Anatomical.entity.name","Stage.ID","Stage.name")]))), file = "BgeeOrgans.txt", row.names = F)
 utils::write.table(
-  Organs |> dplyr::distinct() |>
-    dplyr::mutate(Anatomical.entity.name = toupper(Anatomical.entity.name)),
+  Organs |>
+    dplyr::mutate(Anatomical.entity.name = toupper(Anatomical.entity.name)) |>
+    dplyr::arrange(Anatomical.entity.name) |>
+    dplyr::distinct(),
   file = "BgeeOrgans.txt",
-  row.names = FALSE
+  row.names = FALSE,
+  sep = ";"
 )
 utils::write.table(
-  Ages |> dplyr::distinct() |>
-    dplyr::mutate(Stage.name = toupper(Stage.name)),
+  Ages |>
+    dplyr::mutate(Stage.name = toupper(Stage.name)) |>
+    dplyr::arrange(Stage.ID) |>
+    dplyr::distinct(),
   file = "BgeeAges.txt",
-  row.names = FALSE
+  row.names = FALSE,
+  sep = ";"
 )
-
+setwd("../")
 # write.table(Organs, file = "BgeeAnnotations.txt", row.names = F)
 # 2.0 Use tissue container information of getAnnotation(bgee) for UBERON: annotations
 ## paste0(PATH_DB,"TAB_CONTAINER_TISSUE.txt")
