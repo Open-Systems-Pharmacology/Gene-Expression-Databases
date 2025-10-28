@@ -123,7 +123,8 @@ utils::write.table(
     dplyr::distinct(),
   file = "BgeeOrgans.txt",
   row.names = FALSE,
-  sep = ";"
+  sep = ";",
+  quote = FALSE
 )
 utils::write.table(
   Ages |>
@@ -132,7 +133,8 @@ utils::write.table(
     dplyr::distinct(),
   file = "BgeeAges.txt",
   row.names = FALSE,
-  sep = ";"
+  sep = ";",
+  quote = FALSE
 )
 setwd("../")
 # write.table(Organs, file = "BgeeAnnotations.txt", row.names = F)
