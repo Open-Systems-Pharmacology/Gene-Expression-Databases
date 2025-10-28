@@ -31,12 +31,12 @@ source(paste0(PATH, "/Code/helper_Species.R"))
 # Get gene annotation information ####
 # Human information needs to be added first,
 # is the basis for gene homology of other species
-PrepareBioMarts("Human")
+PrepareBioMarts(SPECIE = "Human")
 for (Specie in PharmaSpecies) {
-  PrepareBioMarts(Specie)
+  PrepareBioMarts(SPECIE = Specie)
 }
 for (Specie in AnimalHealthSpecies) {
-  PrepareBioMarts(Specie)
+  PrepareBioMarts(SPECIE = Specie)
 }
 
 # make PKsimDB for pharmacological species and their ADME genes ####
