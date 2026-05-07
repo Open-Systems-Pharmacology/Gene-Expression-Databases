@@ -1,0 +1,51 @@
+Package: OSPGeneExpressionQualification
+Title: OSP Expression Database Qualification and Validation
+Version: 3.0.2
+Date: 2024-06-14
+Description: Qualification framework for OSP gene expression databases
+Authors@R: c(
+    person("Open Systems Pharmacology", role = c("cph")),
+    person("Developer", email = "dev@example.com", role = "aut")
+)
+License: CC0 1.0 Universal
+
+# R Version Requirement
+Language: R
+R_Version: >= 4.4.1
+
+# Core Dependencies
+Depends:
+    R (>= 4.4.1)
+
+# Main Package Dependencies (with tested versions for Bgee 15.2)
+Imports:
+    here (>= 1.0.1),
+    dplyr (>= 1.2.1),
+    readr (>= 2.1.5),
+    ggplot2 (>= 4.0.0),
+    ggrepel (>= 0.9.6),
+    scales (>= 1.4.0),
+    tidyr (>= 1.3.1),
+    DBI (>= 1.2.3),
+    RSQLite (>= 2.4.3),
+    BgeeDB (>= 2.32.0),
+    tidyselect (>= 1.2.1),
+    stringr (>= 1.5.1),
+    rlang (>= 1.1.4),
+    biomaRt (>= 2.62.0),
+    foreach (>= 1.5.2),
+    doParallel (>= 1.0.17)
+
+# Bioconductor Packages
+biocViews: 
+    GeneExpression,
+    ExpressionData,
+    Annotation,
+    DataRepresentation
+
+# URL References
+URL: https://github.com/Open-Systems-Pharmacology/Gene-Expression-Databases
+BugReports: https://github.com/Open-Systems-Pharmacology/Gene-Expression-Databases/issues
+
+# Documentation
+RoxygenNote: 7.3.2

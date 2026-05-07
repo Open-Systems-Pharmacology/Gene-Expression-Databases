@@ -46,3 +46,5 @@ node_modules*
 
 # Large artifacts published via GitHub Releases (not tracked in git history)
 PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz
+# Archive folder for old/redundant files
+.archive/
