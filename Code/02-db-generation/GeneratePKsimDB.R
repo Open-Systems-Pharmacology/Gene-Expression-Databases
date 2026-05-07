@@ -51,7 +51,7 @@ GeneratePKsimDB <- function(
       message("Code was tested for Bgee release 15_2")
     },
     {
-      simpleMessage(
+      message(
         paste0(
           "Input Bgee release: ", RELEASE,
           " was not recognized. Default: 15_2 is used instead"
