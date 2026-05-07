@@ -292,6 +292,13 @@ plot_family_violins <- function(old_data, new_data, family_name, output_path) {
       size = 2.5,
       alpha = 0.7
     ) +
+    ggplot2::geom_point(
+      data = plot_data_new,
+      ggplot2::aes(color = DB),
+      position = ggplot2::position_jitter(width = 0.15, height = 0),
+      size = 2,
+      alpha = 0.5
+    ) +
     ggplot2::scale_y_log10(
       labels = scales::trans_format("log10", scales::math_format(10^.x))
     ) +

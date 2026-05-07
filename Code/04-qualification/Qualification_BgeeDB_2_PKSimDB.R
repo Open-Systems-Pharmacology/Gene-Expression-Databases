@@ -156,12 +156,20 @@ if (!is.null(GSE30611_ERX011211_OSP_DB)) {
         shape = 21,
         fill = family_colors[family]
       ) +
+       ggrepel::geom_text_repel(
+         ggplot2::aes(label = gene_name),
+         size = 2.5,
+         max.overlaps = 20,
+         alpha = 0.7,
+         box.padding = ggplot2::unit(0.3, "lines"),
+         point.padding = ggplot2::unit(0.3, "lines")
+       ) +
       ggplot2::geom_smooth(
         method = "lm",
         se = FALSE,
         color = "gray40",
         linetype = "dashed",
-        size = 0.6,
+         linewidth = 0.6,
         alpha = 0.5
       ) +
       ggplot2::scale_x_log10(
