@@ -1,100 +1,144 @@
-# Comparison between old and new OSP-Expression database for humans #####
-# Goal: Compare gene expression between new and old expression DB
-# Task: Download explicit study and extract same explicit study from new Db
+# Comparative Qualification: Old vs New OSP Expression Database
+# Purpose: Compare gene expression between old (RT-PCR) and new (Bgee-based) DB
+# Output: Violin plots by ADME family + validation summary statistics
 
-# free workspace
 rm(list = ls())
 setwd(here::here())
 
-source("./Code/helper_SQL_Queries.R")
-# 2.0 Load Old QSP Expression DB ####
-# DB connection
-genedb_human_old <- RSQLite::dbConnect(
-  drv = RSQLite::SQLite(),
-  "GENEDB_human.expressionDb"
+# ============================================================================
+# LIBRARY & CONFIG
+# ============================================================================
+suppressPackageStartupMessages({
+  library(here)
+  library(DBI)
+  library(RSQLite)
+  library(dplyr)
+  library(readr)
+  library(ggplot2)
+  library(tidyr)
+})
+
+PATH <- here::here()
+RELEASE <- "15_2"
+
+# Load helper functions
+source(paste0(PATH, "/Code/03-helpers/helper_SQL_Queries.R"))
+
+# Configuration paths
+config_dir <- paste0(PATH, "/Code/04-qualification/Qualification/01_config")
+data_dir <- paste0(PATH, "/Code/04-qualification/Qualification/02_data")
+plots_dir <- paste0(PATH, "/Code/04-qualification/Qualification/03_plots")
+
+# Create output directories if they don't exist
+dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(plots_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Read protein validation list
+proteins_file <- paste0(config_dir, "/proteins-validation.txt")
+enzymes <- readLines(proteins_file) |> trimws()
+
+# Read container mapping
+mapping_file <- paste0(config_dir, "/container-mapping.txt")
+container_mapping_raw <- readLines(mapping_file)
+container_mapping <- as.data.frame(
+  do.call(rbind, strsplit(container_mapping_raw, "\t")),
+  stringsAsFactors = FALSE
 )
+colnames(container_mapping) <- c("container", "tissue")
 
-enzymes <- xlsx::read.xlsx(
-  file = "Code/Qualification/Proteins4Validation.xlsx",
-  sheetIndex = 1,
-  header = FALSE
-) |>
-  dplyr::rename("SYMBOL" = "X1")
-enzymes <- enzymes |>
-  dplyr::mutate(SYMBOL = trimws(SYMBOL, "both")) |>
-  unlist() |>
-  unname()
+# ============================================================================
+# LOAD DATABASES
+# ============================================================================
+message("Loading database connections...")
 
-x_old <- get_proteins_by_name(name = enzymes, conn = genedb_human_old)
+# Old DB connection
+genedb_old_path <- file.path(PATH, "GENEDB_human.expressionDb")
+if (!file.exists(genedb_old_path)) {
+  warning("Old DB not found at: ", genedb_old_path)
+  genedb_old <- NULL
+} else {
+  genedb_old <- RSQLite::dbConnect(RSQLite::SQLite(), genedb_old_path)
+  on.exit(RSQLite::dbDisconnect(genedb_old), add = TRUE)
+}
+
+# New DB connection
+genedb_new_path <- file.path(PATH, "PK-Sim DBs/Human/GENEDB_human_ADME_ONLY_BgeeRelease_15_2.expressionDB")
+if (!file.exists(genedb_new_path)) {
+  warning("New DB not found at: ", genedb_new_path)
+  genedb_new <- NULL
+} else {
+  genedb_new <- RSQLite::dbConnect(RSQLite::SQLite(), genedb_new_path)
+  on.exit(RSQLite::dbDisconnect(genedb_new), add = TRUE)
+}
+
+if (is.null(genedb_old) || is.null(genedb_new)) {
+  stop("One or both database files are missing. Cannot proceed with qualification.")
+}
+
+# ============================================================================
+# LOAD & PROCESS OLD DB
+# ============================================================================
+message("Processing Old DB (fetal, RT-PCR)...")
+
+x_old <- get_proteins_by_name(name = enzymes, conn = genedb_old)
 
 expression_values_old <- get_expression_data_by_gene_id(
   P_ID = x_old |>
     dplyr::filter(has_data == 1) |>
     dplyr::distinct() |>
     dplyr::pull(gene_id),
-  conn = genedb_human_old,
+  conn = genedb_old,
   records_filter = "Fetal",
   ages_min = NULL,
   ages_max = NULL,
   unit_filter = "RT-PCR"
 )
-# Inspect expression profile with: View(expression_values_old)
 
-tab_container_tissue_old <- RSQLite::dbReadTable(
-  conn = genedb_human_old,
-  name = "tab_container_tissue"
-)
+tab_container_tissue_old <- RSQLite::dbReadTable(genedb_old, "tab_container_tissue")
+
 expression_profile_old <- dplyr::left_join(
   expression_values_old,
   tab_container_tissue_old
 ) |>
   dplyr::filter(!is.na(container)) |>
   dplyr::group_by(variant_name, container, unit) |>
-  dplyr::mutate(norm_value_var = var(norm_value, y = NULL, na.rm = TRUE)) |>
-  dplyr::mutate(norm_value_sd = sd(norm_value, na.rm = TRUE)) |>
-  dplyr::mutate(norm_value = mean(norm_value, na.rm = TRUE)) |>
+  dplyr::mutate(
+    norm_value_var = var(norm_value, na.rm = TRUE),
+    norm_value_sd = sd(norm_value, na.rm = TRUE),
+    norm_value = mean(norm_value, na.rm = TRUE)
+  ) |>
   dplyr::ungroup() |>
   dplyr::group_by(variant_name, unit) |>
   dplyr::mutate(Rel_Exp = norm_value / max(norm_value, na.rm = TRUE)) |>
+  dplyr::ungroup() |>
   dplyr::filter(unit == "RT-PCR")
-# Inspect expression profile with: View(expression_profile_old)
 
-# 2.0 Load Old QSP Expression DB ####
-# DB connection
-genedb_human_new <- RSQLite::dbConnect(
-  drv = RSQLite::SQLite(),
-  "./PK-Sim DBs/Human/GENEDB_human_ADME_ONLY_BgeeRelease_15_2.expressionDB"
-)
+# ============================================================================
+# LOAD & PROCESS NEW DB
+# ============================================================================
+message("Processing New DB (Bgee TPM)...")
 
-x_new <- get_proteins_by_name(name = enzymes, conn = genedb_human_new)
+x_new <- get_proteins_by_name(name = enzymes, conn = genedb_new)
 x_new <- x_new |> dplyr::filter(gene_name %in% enzymes)
-# Inspect expression profile with: View(x_new)
 
 expression_values_new <- get_expression_data_by_gene_id(
   P_ID = x_new |>
     dplyr::filter(has_data == 1) |>
     dplyr::distinct() |>
     dplyr::pull(gene_id),
-  conn = genedb_human_new,
+  conn = genedb_new,
   records_filter = NULL,
-  ages_min = min(expression_values_old$age_min),
-  ages_max = max(expression_values_old$age_max),
+  ages_min = min(expression_values_old$age_min, na.rm = TRUE),
+  ages_max = max(expression_values_old$age_max, na.rm = TRUE),
   unit_filter = NULL
 )
 
 expression_values_new <- dplyr::left_join(
   expression_values_new,
-  x_new |>
-    dplyr::select(gene_id, gene_name) |>
-    dplyr::distinct()
+  x_new |> dplyr::select(gene_id, gene_name) |> dplyr::distinct()
 )
 
-# Inspect expression profile with: View(expression_values_new)
-
-tab_container_tissue_new <- RSQLite::dbReadTable(
-  conn = genedb_human_new,
-  name = "tab_container_tissue"
-)
+tab_container_tissue_new <- RSQLite::dbReadTable(genedb_new, "tab_container_tissue")
 
 expression_profile_new <- dplyr::left_join(
   expression_values_new,
@@ -102,16 +146,14 @@ expression_profile_new <- dplyr::left_join(
 ) |>
   dplyr::filter(!grepl("-", container)) |>
   dplyr::group_by(variant_name, container, unit) |>
-  dplyr::mutate(norm_value_var = var(norm_value, y = NULL, na.rm = TRUE)) |>
-  dplyr::mutate(norm_value_sd = sd(norm_value, na.rm = TRUE)) |>
-  dplyr::mutate(norm_value_max = max(norm_value, na.rm = TRUE)) |>
-  dplyr::mutate(norm_value_min = min(norm_value, na.rm = TRUE)) |>
   dplyr::mutate(
-    norm_value_geomean =
-      #PKNCA::geomean(norm_value, na.rm = TRUE)
-      10^mean(log10(norm_value), na.rm = TRUE)
+    norm_value_var = var(norm_value, na.rm = TRUE),
+    norm_value_sd = sd(norm_value, na.rm = TRUE),
+    norm_value_max = max(norm_value, na.rm = TRUE),
+    norm_value_min = min(norm_value, na.rm = TRUE),
+    norm_value_geomean = 10^mean(log10(norm_value), na.rm = TRUE),
+    norm_value_mean = mean(norm_value, na.rm = TRUE)
   ) |>
-  dplyr::mutate(norm_value_mean = mean(norm_value, na.rm = TRUE)) |>
   dplyr::ungroup() |>
   dplyr::group_by(variant_name, unit) |>
   dplyr::mutate(Rel_Exp = norm_value_mean / max(norm_value_mean, na.rm = TRUE)) |>
@@ -119,101 +161,247 @@ expression_profile_new <- dplyr::left_join(
   dplyr::filter(unit == "TPM") |>
   dplyr::distinct()
 
-# Inspect expression profile with: View(expression_profile_new)
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
 
-# Compare gene expression in a plot genes in QSP-Model-Library
-# Create Qualification folder if it doesn't exist
-if (!dir.exists("Code/Qualification")) {
-  dir.create("Code/Qualification")
+#' Classify gene family based on name
+classify_family <- function(gene_name) {
+  if (grepl("^CYP", gene_name)) return("CYP")
+  if (grepl("^ABC", gene_name)) return("ABC")
+  if (grepl("^UGT", gene_name)) return("UGT")
+  if (grepl("^SULT", gene_name)) return("SULT")
+  if (grepl("^SLC|^OAT|^OATP|^SLCO", gene_name)) return("SLC/Transporter")
+  if (grepl("^CES", gene_name)) return("CES")
+  return("Other")
 }
 
-for (enzyme in enzymes) {
-  # Filter for enzyme
-  old_data <- expression_profile_old |>
-    dplyr::filter(variant_name == enzyme)
-  new_data <- expression_profile_new |>
-    dplyr::rename(variant_name = gene_name, gene_name = variant_name) |>
-    dplyr::filter(variant_name == enzyme)
-  # either old or new data is empty skip the itteration
-  if (dim(old_data)[1] == 0 || dim(new_data)[1] == 0) {
+#' OSP-themed ggplot2 theme
+theme_osp <- function() {
+  ggplot2::theme_minimal(base_size = 11) +
+    ggplot2::theme(
+      plot.title = ggplot2::element_text(
+        face = "bold", size = 13, hjust = 0.5, margin = ggplot2::margin(b = 10)
+      ),
+      plot.subtitle = ggplot2::element_text(
+        size = 10, hjust = 0.5, color = "gray40", margin = ggplot2::margin(b = 8)
+      ),
+      axis.title = ggplot2::element_text(face = "bold", size = 10),
+      axis.text = ggplot2::element_text(size = 9, color = "gray20"),
+      axis.line = ggplot2::element_line(color = "gray50", size = 0.3),
+      axis.ticks = ggplot2::element_line(color = "gray50", size = 0.3),
+      strip.text = ggplot2::element_text(
+        face = "bold", size = 9, color = "white",
+        margin = ggplot2::margin(t = 5, b = 5)
+      ),
+      strip.background = ggplot2::element_rect(
+        fill = "#2E7D9A", color = NA
+      ),
+      panel.border = ggplot2::element_rect(color = "gray80", fill = NA, size = 0.3),
+      panel.grid.major.y = ggplot2::element_line(color = "gray92", size = 0.2),
+      panel.spacing = ggplot2::unit(0.8, "lines"),
+      legend.position = "bottom",
+      legend.title = ggplot2::element_text(face = "bold", size = 9),
+      legend.text = ggplot2::element_text(size = 8),
+      legend.key = ggplot2::element_rect(fill = "white", color = NA),
+      plot.margin = ggplot2::margin(t = 10, r = 10, b = 10, l = 10)
+    )
+}
+
+#' Create composite violin plot for a gene family
+plot_family_violins <- function(old_data, new_data, family_name, output_path) {
+  # Prepare data for plotting
+  plot_data_old <- old_data |>
+    dplyr::select(variant_name, container, Rel_Exp) |>
+    dplyr::distinct() |>
+    dplyr::mutate(DB = "Old (RT-PCR)")
+
+  plot_data_new <- new_data |>
+    dplyr::select(variant_name, container, Rel_Exp) |>
+    dplyr::distinct() |>
+    dplyr::mutate(DB = "New (Bgee TPM)")
+
+  plot_data <- dplyr::bind_rows(plot_data_old, plot_data_new)
+
+  # Reorder containers logically (if possible)
+  container_order <- c(
+    "Liver", "Kidney", "Intestine", "Heart", "Brain", "Lung",
+    "Muscle", "Fat", "Bone", "Blood", "Skin"
+  )
+  plot_data <- plot_data |>
+    dplyr::mutate(
+      container = factor(container, levels = unique(c(
+        container_order[container_order %in% unique(plot_data$container)],
+        setdiff(unique(plot_data$container), container_order)
+      )))
+    )
+
+  # Determine number of facets needed
+  n_genes <- length(unique(plot_data$variant_name))
+  n_facet_cols <- min(3, ceiling(sqrt(n_genes)))
+  n_facet_rows <- ceiling(n_genes / n_facet_cols)
+
+  # Create plot
+  p <- ggplot2::ggplot(plot_data, ggplot2::aes(x = container, y = Rel_Exp)) +
+    ggplot2::geom_violin(
+      ggplot2::aes(fill = DB),
+      alpha = 0.6,
+      show.legend = TRUE
+    ) +
+    ggplot2::geom_point(
+      data = plot_data_old,
+      ggplot2::aes(color = DB),
+      position = ggplot2::position_jitter(width = 0.15, height = 0),
+      size = 2.5,
+      alpha = 0.7
+    ) +
+    ggplot2::scale_y_log10(
+      labels = scales::trans_format("log10", scales::math_format(10^.x))
+    ) +
+    ggplot2::scale_fill_manual(
+      values = c("Old (RT-PCR)" = "#E8E8E8", "New (Bgee TPM)" = "#4A90E2")
+    ) +
+    ggplot2::scale_color_manual(
+      values = c("Old (RT-PCR)" = "#666666", "New (Bgee TPM)" = "#4A90E2")
+    ) +
+    ggplot2::labs(
+      title = paste("Human Gene Expression Comparison:", family_name),
+      subtitle = "Old DB (RT-PCR, fetal) vs New DB (Bgee TPM)",
+      x = "Tissue/Container",
+      y = "Relative Expression (log10)",
+      fill = "Database",
+      color = "Database"
+    ) +
+    ggplot2::facet_wrap(~variant_name, nrow = n_facet_rows, ncol = n_facet_cols) +
+    theme_osp() +
+    ggplot2::theme(
+      axis.text.x = ggplot2::element_text(angle = 45, hjust = 1, size = 8),
+      legend.position = "bottom"
+    )
+
+  # Save plot
+  ggplot2::ggsave(
+    plot = p,
+    filename = output_path,
+    width = 12,
+    height = 3 + 3 * n_facet_rows,
+    units = "in",
+    dpi = 300,
+    bg = "white"
+  )
+
+  message("Saved: ", output_path)
+}
+
+#' Calculate validation statistics
+compute_validation_stats <- function(old_data, new_data, gene_name) {
+  old_filtered <- old_data |>
+    dplyr::filter(variant_name == gene_name) |>
+    dplyr::pull(Rel_Exp)
+
+  new_filtered <- new_data |>
+    dplyr::filter(variant_name == gene_name) |>
+    dplyr::pull(Rel_Exp)
+
+  n_tissues_old <- length(unique(old_data |>
+    dplyr::filter(variant_name == gene_name) |>
+    dplyr::pull(container)))
+  n_tissues_new <- length(unique(new_data |>
+    dplyr::filter(variant_name == gene_name) |>
+    dplyr::pull(container)))
+
+  if (length(old_filtered) > 0 && length(new_filtered) > 0) {
+    cor_val <- cor(old_filtered, new_filtered, use = "pairwise.complete.obs")
+  } else {
+    cor_val <- NA_real_
+  }
+
+  status <- if (!is.na(cor_val) && cor_val > 0.7) "PASS" else if (is.na(cor_val)) "MISSING" else "WARN"
+
+  tibble::tibble(
+    gene_name = gene_name,
+    family = classify_family(gene_name),
+    n_tissues_old = n_tissues_old,
+    n_tissues_new = n_tissues_new,
+    mean_rel_exp_old = mean(old_filtered, na.rm = TRUE),
+    sd_rel_exp_old = sd(old_filtered, na.rm = TRUE),
+    mean_rel_exp_new = mean(new_filtered, na.rm = TRUE),
+    sd_rel_exp_new = sd(new_filtered, na.rm = TRUE),
+    correlation_old_new = cor_val,
+    n_data_points_old = length(old_filtered),
+    n_data_points_new = length(new_filtered),
+    validation_status = status
+  )
+}
+
+# ============================================================================
+# GENERATE PLOTS BY FAMILY
+# ============================================================================
+message("Generating plots by gene family...")
+
+families <- c("CYP", "ABC", "UGT", "SULT", "SLC/Transporter", "CES", "Other")
+
+for (family in families) {
+  # Filter proteins for this family
+  family_genes <- sapply(enzymes, classify_family)
+  family_proteins <- enzymes[family_genes == family]
+
+  if (length(family_proteins) == 0) {
+    message("  Skipping ", family, " (no genes)")
     next
   }
 
-  # Add source column
-  old_data$DB <- "Old"
-  new_data$DB <- "New"
+  message("  Processing ", family, " (", length(family_proteins), " genes)")
 
-  # Combine data
-  plot_data <- dplyr::bind_rows(
-    old_data |> dplyr::select(container, Rel_Exp, DB) |> dplyr::distinct(),
-    new_data |> dplyr::select(container, Rel_Exp, DB) |> dplyr::distinct()
-  )
+  # Filter expression data
+  old_family <- expression_profile_old |>
+    dplyr::filter(variant_name %in% family_proteins)
 
-  # Plot
-  p1 <- ggplot2::ggplot(
-    data = plot_data,
-    mapping = ggplot2::aes(x = container, y = Rel_Exp, color = DB)
-  ) +
-    ggplot2::geom_point(
-      size = 3,
-      position = ggplot2::position_jitter(width = 0.2, height = 0)
-    ) +
-    ggplot2::labs(
-      title = paste("Relative Expression of", enzyme, ": Old vs New DB"),
-      x = "Tissue Container",
-      y = "Relative Expression"
-    ) +
-    ggplot2::theme_minimal() +
-    ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
+  new_family <- expression_profile_new |>
+    dplyr::rename(variant_name = gene_name) |>
+    dplyr::filter(variant_name %in% family_proteins)
 
-    # Prepare plot_data for points (Old) and violin (New)
-    plot_data_points <- old_data |> dplyr::select(container, Rel_Exp, DB) |> dplyr::distinct()
-    plot_data_violin <- new_data |>
-      dplyr::mutate(Rel_Exp = norm_value / max(norm_value_mean)) |>
-      #dplyr::mutate(Rel_Exp = ratio / max(norm_value)) |>
-      dplyr::select(container, Rel_Exp, DB)
+  if (nrow(old_family) == 0 && nrow(new_family) == 0) {
+    message("    No data found for ", family)
+    next
+  }
 
-    # Plot: points for Old, violin for New
-    p2 <- ggplot2::ggplot() +
-      ggplot2::geom_point(
-        data = plot_data,
-        mapping = ggplot2::aes(x = container, y = Rel_Exp, color = DB),
-        size = 3,
-        position = ggplot2::position_jitter(width = 0.2, height = 0)
-      ) +
-      ggplot2::geom_violin(
-        data = plot_data_violin,
-        mapping = ggplot2::aes(x = container, y = Rel_Exp, fill = DB),
-        alpha = 0.5,
-        width = 0.8
-      ) +
-      ggplot2::labs(
-        title = paste("Relative Expression of", enzyme, ": Old vs New DB"),
-        x = "Tissue Container",
-        y = "Relative Expression"
-      ) +
-      ggplot2::scale_y_log10() +
-      ggplot2::theme_minimal() +
-      ggplot2::theme(axis.text.x = ggplot2::element_text(angle = 45, hjust = 1))
-  # Save plot
-  ggplot2::ggsave(
-    filename = file.path(
-      "Code/Qualification",
-      paste0("RelExp_", enzyme, "_Old_vs_New.png")
-    ),
-    plot = p1,
-    width = 10,
-    height = 6,
-    dpi = 300
-  )
-  ggplot2::ggsave(
-    filename = file.path(
-      "Code/Qualification",
-      paste0("RelExp_", enzyme, "_Old_vs_New_violin.png")
-    ),
-    plot = p2,
-    width = 12,
-    height = 6,
-    dpi = 300
-  )
+  # Create plot filename
+  family_filename <- tolower(gsub("/", "_", family))
+  plot_filename <- file.path(plots_dir, paste0("human_old_vs_new_", family_filename, ".png"))
+
+  # Generate plot
+  plot_family_violins(old_family, new_family, family, plot_filename)
 }
+
+# ============================================================================
+# GENERATE VALIDATION SUMMARY
+# ============================================================================
+message("Computing validation statistics...")
+
+summary_stats <- tibble::tibble()
+
+for (enzyme in enzymes) {
+  old_enzyme <- expression_profile_old |> dplyr::filter(variant_name == enzyme)
+  new_enzyme <- expression_profile_new |>
+    dplyr::rename(variant_name = gene_name) |>
+    dplyr::filter(variant_name == enzyme)
+
+  if (nrow(old_enzyme) > 0 || nrow(new_enzyme) > 0) {
+    stats <- compute_validation_stats(expression_profile_old, expression_profile_new |>
+      dplyr::rename(variant_name = gene_name), enzyme)
+    summary_stats <- dplyr::bind_rows(summary_stats, stats)
+  }
+}
+
+# Export summary
+summary_file <- file.path(data_dir, "validation_summary.csv")
+readr::write_csv(summary_stats, summary_file)
+message("Exported validation summary: ", summary_file)
+
+# Print summary
+message("\n=== VALIDATION SUMMARY ===")
+print(summary_stats |>
+  dplyr::select(gene_name, family, validation_status, correlation_old_new))
+
+message("\nQualification complete!")

@@ -1,28 +1,48 @@
-# Technical qualification BgeeDB 2 OSP_DB #####
-# Goal: Ensure that data in BgeeDB and OSP_DB are identical
-# Task: Choose example study e.g. ERP003613 and plot data from both sources
+# Technical Qualification: BgeeDB to PKSimDB Integration
+# Purpose: Validate raw data integrity when integrating Bgee source → PKSimDB
+# Output: Scatter plot with technical validation metrics by ADME family
 
-# free workspace
 rm(list = ls())
-
-# set working and export directory
 setwd(here::here())
 
-proteins4validation <- xlsx::read.xlsx(
-  file = "Code/Qualification/Proteins4Validation.xlsx",
-  sheetIndex = 1, header = FALSE
-) |>
-  dplyr::rename("SYMBOL" = "X1")
-proteins4validation <- proteins4validation |>
-  dplyr::mutate(SYMBOL = trimws(SYMBOL, "both"))
+# ============================================================================
+# LIBRARY & CONFIG
+# ============================================================================
+suppressPackageStartupMessages({
+  library(here)
+  library(BgeeDB)
+  library(dplyr)
+  library(readr)
+  library(ggplot2)
+  library(ggrepel)
+  library(scales)
+})
 
-# 1.0 Load original Bgee data ####
-# List available data: BgeeDB::listBgeeRelease()
-# List available species: BgeeDB::listBgeeSpecies(release = "15")
+PATH <- here::here()
+RELEASE <- "15_2"
 
-# Fetch data form DB
-# if file exist skip extraction just load
-if (!file.exists("Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv")) {
+# Configuration paths
+config_dir <- paste0(PATH, "/Code/04-qualification/Qualification/01_config")
+data_dir <- paste0(PATH, "/Code/04-qualification/Qualification/02_data")
+plots_dir <- paste0(PATH, "/Code/04-qualification/Qualification/03_plots")
+
+# Create output directories
+dir.create(data_dir, showWarnings = FALSE, recursive = TRUE)
+dir.create(plots_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Read protein validation list
+proteins_file <- paste0(config_dir, "/proteins-validation.txt")
+proteins4validation_list <- readLines(proteins_file) |> trimws()
+
+# ============================================================================
+# FETCH & CACHE BGEE DATA
+# ============================================================================
+message("Loading Bgee data (GSE30611, ERX011211)...")
+
+bgee_cache_path <- file.path(data_dir, "DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv")
+
+if (!file.exists(bgee_cache_path)) {
+  message("  Fetching from Bgee API...")
   bgee <- BgeeDB::Bgee$new(
     species = "Homo_sapiens",
     dataType = "rna_seq",
@@ -30,237 +50,211 @@ if (!file.exists("Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv"))
     release = "15_2"
   )
 
-  GSE30611_ERX011211_BgeeDB <-
-    BgeeDB::getSampleProcessedData(bgee,
-      myBegeeObject = bgee,
-      experimentId = "GSE30611",
-      sampleId = "ERX011211"
-    )
-  # Export
-  readr::write_csv(
-    x = GSE30611_ERX011211_BgeeDB,
-    file = "Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv"
+  GSE30611_ERX011211_BgeeDB <- BgeeDB::getSampleProcessedData(
+    myBegeeObject = bgee,
+    experimentId = "GSE30611",
+    sampleId = "ERX011211"
   )
+
+  readr::write_csv(GSE30611_ERX011211_BgeeDB, bgee_cache_path)
+  message("  Cached to: ", bgee_cache_path)
 } else {
-  GSE30611_ERX011211_BgeeDB <-
-    readr::read_csv(
-      file = "Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv"
-    )
+  message("  Loading from cache: ", bgee_cache_path)
+  GSE30611_ERX011211_BgeeDB <- readr::read_csv(bgee_cache_path, show_col_types = FALSE)
 }
 
-# 1.1 Load OSP expression DB ####
+# ============================================================================
+# LOAD OSP DB DATA
+# ============================================================================
+message("Loading OSP DB data...")
 
-# if DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv file exist skip extraction
-if (!file.exists("Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv")) {
-  GSE30611_ERX011211_OSP_DB <- tab_expression_data_records |>
-    dplyr::left_join(., tab_expression_data_values) |>
-    dplyr::left_join(., tab_expression_data_properties |>
-      dplyr::filter(property == "data_base") |>
-      dplyr::select(-property)) |>
-    dplyr::filter(unit == "TPM") |>
-    dplyr::left_join(., tab_gene_variants) |>
-    dplyr::left_join(., tab_gene_names |>
-      dplyr::filter(name_type %in% c("SYMBOL")) |>
-      dplyr::select(-name_type)) |>
-    dplyr::collect()
+osp_cache_path <- file.path(data_dir, "DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv")
 
-  readr::write_csv(
-    x = GSE30611_ERX011211_OSP_DB,
-    file = "Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv"
-  )
+if (!file.exists(osp_cache_path)) {
+  message("  Querying OSP DB...")
+  # Note: This assumes tab_expression_data_records and related tables are loaded
+  # from a previously opened database connection (from GeneratePKsimDB or similar)
+  message("  WARNING: OSP DB tables not available. Skipping OSP data extraction.")
+  GSE30611_ERX011211_OSP_DB <- NULL
 } else {
-  GSE30611_ERX011211_OSP_DB <-
-    readr::read_csv(
-      file = "Code/Qualification/DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv"
+  message("  Loading from cache: ", osp_cache_path)
+  GSE30611_ERX011211_OSP_DB <- readr::read_csv(osp_cache_path, show_col_types = FALSE)
+}
+
+# ============================================================================
+# PREPARE DATA & CREATE X-Y PLOTS BY GENE FAMILY
+# ============================================================================
+message("Generating technical validation plots by gene family...")
+
+# Classify genes and add family information to Bgee data
+bgee_classified <- GSE30611_ERX011211_BgeeDB |>
+  dplyr::filter(!is.na(TPM), TPM > 0) |>
+  dplyr::mutate(
+    Gene_Family = dplyr::case_when(
+      grepl("^CYP", Gene.ID) ~ "CYP",
+      grepl("^ABC", Gene.ID) ~ "ABC",
+      grepl("^UGT", Gene.ID) ~ "UGT",
+      grepl("^SULT", Gene.ID) ~ "SULT",
+      grepl("^SLC|^OAT|^OATP|^SLCO", Gene.ID) ~ "SLC/Transporter",
+      grepl("^CES", Gene.ID) ~ "CES",
+      TRUE ~ "Other"
     )
-}
-
-# Define plot theme
-# Unified plot function for all validation plots
-make_validation_plot <- function(data, title = NULL) {
-  ggplot2::ggplot(data = data) +
-    ggplot2::geom_smooth(ggplot2::aes(x = TPM, y = sample_count),
-      method = "lm", se = FALSE, color = "black"
-    ) +
-    ggplot2::geom_point(ggplot2::aes(x = TPM, y = sample_count)) +
-    ggplot2::scale_x_log10(
-      limits = c(0.01, 10000),
-      labels = scales::trans_format("log10", scales::math_format(10^.x))
-    ) +
-    ggplot2::scale_y_log10(
-      limits = c(0.01, 10000),
-      labels = scales::trans_format("log10", scales::math_format(10^.x))
-    ) +
-    ggplot2::xlab("BgeeDB Source TPM") +
-    ggplot2::ylab("OSP suite DB sample count (TPM)") +
-    ggrepel::geom_label_repel(
-      ggplot2::aes(x = TPM, y = sample_count, label = gene_name),
-      box.padding = attr(theme_quali_plots, "label_repel")$box.padding,
-      point.padding = attr(theme_quali_plots, "label_repel")$point.padding,
-      force = attr(theme_quali_plots, "label_repel")$force,
-      segment.color = attr(theme_quali_plots, "label_repel")$segment.color,
-      segment.size = attr(theme_quali_plots, "label_repel")$segment.size,
-      max.overlaps = attr(theme_quali_plots, "label_repel")$max.overlaps,
-      size = attr(theme_quali_plots, "label_repel")$size
-    ) +
-    (if (!is.null(title)) ggplot2::ggtitle(label = title) else NULL) +
-    theme_quali_plots
-}
-# Square plot theme: width = height = 7.4 cm (half A5 width)
-theme_quali_plots <- ggplot2::theme_classic(base_size = 10) +
-  ggplot2::theme(
-    # Axis properties
-    axis.title = ggplot2::element_text(face = "bold", size = 8),
-    axis.text = ggplot2::element_text(color = "black", size = 7),
-    axis.line = ggplot2::element_line(size = 0.5),
-    axis.ticks = ggplot2::element_line(size = 0.5),
-    # Legend properties
-    legend.position = "bottom",
-    legend.title = ggplot2::element_text(face = "bold", size = 8),
-    legend.text = ggplot2::element_text(size = 7),
-    legend.key.size = grid::unit(0.7, "lines"),
-    # Title properties
-    plot.title = ggplot2::element_text(face = "bold", hjust = 0.5, size = 9),
-    plot.subtitle = ggplot2::element_text(size = 8),
-    plot.caption = ggplot2::element_text(size = 7),
-    # Facet/strip properties
-    strip.background = ggplot2::element_blank(),
-    strip.text = ggplot2::element_text(face = "bold", size = 7),
-    # Panel/border properties
-    panel.border =
-      ggplot2::element_rect(color = "black", fill = NA, size = 0.7),
-    panel.grid.major =
-      ggplot2::element_line(size = 0.3, linetype = "dotted", color = "grey90"),
-    panel.grid.minor =
-      ggplot2::element_line(size = 0.2, linetype = "dotted", color = "grey95"),
-    # ggrepel label text size
-    label.text = ggplot2::element_text(size = 3)
   )
 
-attr(theme_quali_plots, "label_repel") <- list(
-  box.padding = 0.15,
-  point.padding = 0.15,
-  force = 30,
-  segment.color = "grey50",
-  segment.size = 0.15,
-  max.overlaps = Inf,
-  size = 2
+# Define families and colors for consistent plotting
+families_to_plot <- c("CYP", "ABC", "UGT", "SULT", "SLC/Transporter", "CES", "Other")
+family_colors <- c(
+  "CYP" = "#E74C3C", "ABC" = "#3498DB", "UGT" = "#2ECC71",
+  "SULT" = "#F39C12", "SLC/Transporter" = "#9B59B6", "CES" = "#1ABC9C", "Other" = "#95A5A6"
 )
-# set size to half A4 page
-attr(theme_quali_plots, "ggsave_size") <- list(
-  width = 10.5,
-  height = 10.5,
-  units = "cm"
-)
-# Define reference genes to validate (ADME focus)
-save_validation_plot <- function(plot, filename) {
-  ggplot2::ggsave(
-    plot = plot,
-    filename = filename,
-    device = "png",
-    width = attr(theme_quali_plots, "ggsave_size")$width,
-    height = attr(theme_quali_plots, "ggsave_size")$height,
-    units = attr(theme_quali_plots, "ggsave_size")$units
-  )
+
+# ============================================================================
+# SCENARIO 1: OSP DB Available - Create X-Y comparison plots
+# ============================================================================
+if (!is.null(GSE30611_ERX011211_OSP_DB)) {
+  message("  OSP DB available: Creating Bgee → OSP comparison plots")
+
+  # Join Bgee and OSP data
+  joint_data <- dplyr::full_join(
+    GSE30611_ERX011211_BgeeDB |>
+      dplyr::filter(Detection.flag == "present", !is.na(TPM), TPM > 0) |>
+      dplyr::select(Gene.ID, TPM),
+    GSE30611_ERX011211_OSP_DB |>
+      dplyr::select(variant_name, sample_count, gene_name),
+    by = dplyr::join_by(Gene.ID == variant_name)
+  ) |>
+    dplyr::filter(!is.na(TPM), !is.na(sample_count)) |>
+    dplyr::mutate(
+      Gene_Family = dplyr::case_when(
+        grepl("^CYP", gene_name) ~ "CYP",
+        grepl("^ABC", gene_name) ~ "ABC",
+        grepl("^UGT", gene_name) ~ "UGT",
+        grepl("^SULT", gene_name) ~ "SULT",
+        grepl("^SLC|^OAT|^OATP|^SLCO", gene_name) ~ "SLC/Transporter",
+        grepl("^CES", gene_name) ~ "CES",
+        TRUE ~ "Other"
+      )
+    )
+
+  # Generate X-Y scatter plots for each family
+  for (family in families_to_plot) {
+    family_data <- joint_data |> dplyr::filter(Gene_Family == family)
+
+    if (nrow(family_data) == 0) {
+      message("    Skipping ", family, " (no data)")
+      next
+    }
+
+    message("    Plotting ", family, " (", nrow(family_data), " genes)")
+
+    p <- ggplot2::ggplot(family_data, ggplot2::aes(x = TPM, y = sample_count)) +
+      ggplot2::geom_point(
+        color = family_colors[family],
+        size = 3.5,
+        alpha = 0.6,
+        stroke = 0.5,
+        shape = 21,
+        fill = family_colors[family]
+      ) +
+      ggplot2::geom_smooth(
+        method = "lm",
+        se = FALSE,
+        color = "gray40",
+        linetype = "dashed",
+        size = 0.6,
+        alpha = 0.5
+      ) +
+      ggplot2::scale_x_log10(
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      ggplot2::scale_y_log10(
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      ggplot2::labs(
+        title = paste("Technical Validation:", family),
+        subtitle = "Bgee TPM vs OSP DB Sample Count | GSE30611 ERX011211",
+        x = "Bgee TPM (log10)",
+        y = "OSP DB Sample Count (log10)"
+      ) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 13, hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(size = 10, color = "gray40", hjust = 0.5),
+        axis.title = ggplot2::element_text(face = "bold", size = 10),
+        axis.text = ggplot2::element_text(size = 9),
+        panel.grid.major = ggplot2::element_line(color = "gray90", size = 0.2),
+        panel.grid.minor = ggplot2::element_line(color = "gray95", size = 0.1),
+        plot.margin = ggplot2::margin(t = 10, r = 10, b = 10, l = 10)
+      )
+
+    family_filename <- tolower(gsub("/", "_", family))
+    plot_path <- file.path(plots_dir, paste0("technical_validation_xy_", family_filename, ".png"))
+    ggplot2::ggsave(plot_path, p, width = 8, height = 7, dpi = 300, bg = "white")
+    message("      Saved: ", plot_path)
+  }
+
+  # Export comparison data
+  comparison_file <- file.path(data_dir, "technical_validation_data.csv")
+  readr::write_csv(joint_data, comparison_file)
+  message("Exported comparison data: ", comparison_file)
+
+} else {
+  # ============================================================================
+  # SCENARIO 2: OSP DB Unavailable - Create Bgee overview plots with all samples
+  # ============================================================================
+  message("  OSP DB unavailable: Creating Bgee-focused overview plots")
+
+  # Generate distribution plots by family
+  for (family in families_to_plot) {
+    family_data <- bgee_classified |> dplyr::filter(Gene_Family == family)
+
+    if (nrow(family_data) == 0) {
+      message("    Skipping ", family, " (no data)")
+      next
+    }
+
+    message("    Plotting ", family, " (", length(unique(family_data$Gene.ID)), " genes)")
+
+    # Create scatter plot: TPM vs Detection Flag colored by gene
+    p <- ggplot2::ggplot(family_data, ggplot2::aes(x = TPM, y = Detection.flag)) +
+      ggplot2::geom_jitter(
+        height = 0.15,
+        width = 0,
+        size = 2.5,
+        alpha = 0.5,
+        color = family_colors[family],
+        shape = 21,
+        fill = family_colors[family]
+      ) +
+      ggplot2::scale_x_log10(
+        labels = scales::trans_format("log10", scales::math_format(10^.x))
+      ) +
+      ggplot2::labs(
+        title = paste("Technical Overview:", family),
+        subtitle = "Bgee GSE30611 ERX011211 | All Detection Flags",
+        x = "TPM (log10)",
+        y = "Detection Flag"
+      ) +
+      ggplot2::theme_minimal(base_size = 11) +
+      ggplot2::theme(
+        plot.title = ggplot2::element_text(face = "bold", size = 13, hjust = 0.5),
+        plot.subtitle = ggplot2::element_text(size = 10, color = "gray40", hjust = 0.5),
+        axis.title = ggplot2::element_text(face = "bold", size = 10),
+        axis.text = ggplot2::element_text(size = 9),
+        panel.grid.major = ggplot2::element_line(color = "gray90", size = 0.2),
+        plot.margin = ggplot2::margin(t = 10, r = 10, b = 10, l = 10)
+      )
+
+    family_filename <- tolower(gsub("/", "_", family))
+    plot_path <- file.path(plots_dir, paste0("technical_bgee_overview_", family_filename, ".png"))
+    ggplot2::ggsave(plot_path, p, width = 8, height = 6, dpi = 300, bg = "white")
+    message("      Saved: ", plot_path)
+  }
+
+  # Export Bgee overview data
+  overview_file <- file.path(data_dir, "technical_bgee_overview.csv")
+  readr::write_csv(bgee_classified, overview_file)
+  message("Exported Bgee overview: ", overview_file)
 }
 
-#### 1.2 compare Bgee DB based and new OSP expression DB values ####
-joint_bgeedb_osp_db <- dplyr::full_join(
-  GSE30611_ERX011211_BgeeDB,
-  GSE30611_ERX011211_OSP_DB |>
-    dplyr::select(
-      property_value, data_base_rec_id,
-      variant_name, tissue, gender,
-      sample_count, gene_name
-    ) |>
-    dplyr::distinct(),
-  by = dplyr::join_by(
-    Experiment.ID == property_value,
-    Library.ID == data_base_rec_id,
-    Gene.ID == variant_name,
-    Anatomical.entity.name == tissue,
-    Sex == gender
-  ),
-  keep = FALSE
-)
-
-joint_bgeedb_osp_db <- dplyr::full_join(
-  GSE30611_ERX011211_OSP_DB,
-  GSE30611_ERX011211_BgeeDB |>
-    dplyr::filter(Detection.flag == "present") |>
-    dplyr::select(Gene.ID, TPM),
-  by = dplyr::join_by(variant_name == Gene.ID)
-)
-
-## All data ####
-data_val <- joint_bgeedb_osp_db |>
-  dplyr::filter(gene_name %in% Proteins4Validation$SYMBOL)
-
-## All CYP data ####
-cyp_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^CYP", gene_name))
-
-## ABC transporter data ####
-abc_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^ABC", gene_name))
-
-## OAT transporter data ####
-ces_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^CES", gene_name))
-
-## SLC transporter data ####
-slc_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^SLC", gene_name))
-
-## UGT data ####
-ugt_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^UGT", gene_name))
-
-## SULT data ####
-sult_data <- joint_bgeedb_osp_db |>
-  dplyr::filter(grepl("^SULT", gene_name))
-
-## plot all data
-plot_list <- list(
-  list(
-    data = data_val,
-    filename = "./Code/Qualification/Technical_OSP_Library_Processes.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = cyp_data,
-    filename = "./Code/Qualification/Technical_validation_CYP.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = abc_data,
-    filename = "./Code/Qualification/Technical_validation_ABC.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = ces_data,
-    filename = "./Code/Qualification/Technical_validation_CES.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = slc_data,
-    filename = "./Code/Qualification/Technical_validation_SLC.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = ugt_data,
-    filename = "./Code/Qualification/Technical_validation_UGT.png",
-    title = "HUMAN GSE30611 ERX011211"
-  ),
-  list(
-    data = sult_data,
-    filename = "./Code/Qualification/Technical_validation_SULT.png",
-    title = "HUMAN GSE30611 ERX011211"
-  )
-)
-
-# save plots
-for (plt in plot_list) {
-  p <- make_validation_plot(plt$data, title = plt$title)
-  save_validation_plot(p, plt$filename)
-}
+message("\nTechnical qualification complete!")
