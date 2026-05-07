@@ -13,22 +13,19 @@
 get_expression_by_ensembl_id <- function(ensembl_id, db_conn) {
   # Query tab_gene_names to get variant_id for the Ensembl ID
   # name_type 'ENSEMBL' stores Ensembl gene identifiers
-  query_variant <- sprintf(
-    "SELECT gv.variant_id FROM tab_gene_names gn
+  query_variant <- "SELECT gv.variant_id FROM tab_gene_names gn
      JOIN tab_gene_variants gv ON gn.gene_id = gv.gene_id
-     WHERE gn.gene_name = '%s' AND gn.name_type = 'ENSEMBL'",
-    ensembl_id
-  )
-  variant_ids <- DBI::dbGetQuery(db_conn, query_variant)
+     WHERE gn.gene_name = ? AND gn.name_type = 'ENSEMBL'"
+  variant_ids <- DBI::dbGetQuery(db_conn, query_variant, params = list(ensembl_id))
   if (nrow(variant_ids) == 0) {
     stop(sprintf("No expression data found for Ensembl ID: %s", ensembl_id))
   }
-  # Query tab_expression_data_values for expression values
-  query_expr <- sprintf(
-    "SELECT * FROM tab_expression_data_values WHERE variant_id IN (%s)",
-    paste(variant_ids$variant_id, collapse = ",")
+  # Query tab_expression_data_values for expression values using parameterized IN clause
+  placeholders <- paste(rep("?", nrow(variant_ids)), collapse = ",")
+  query_expr <- paste0(
+    "SELECT * FROM tab_expression_data_values WHERE variant_id IN (", placeholders, ")"
   )
-  expr_values <- DBI::dbGetQuery(db_conn, query_expr)
+  expr_values <- DBI::dbGetQuery(db_conn, query_expr, params = as.list(variant_ids$variant_id))
   return(expr_values)
 }
 

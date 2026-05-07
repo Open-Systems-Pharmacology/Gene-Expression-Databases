@@ -6,7 +6,7 @@ get_proteins_by_name <- function(name, conn) {
 
   proteinsbyname <- tab_gene_names |>
     # dplyr::filter(grepl(name, gene_name)) |>
-    dplyr::filter(stringr::str_detect(gene_name, paste(name, collapse = "|"))) |>
+    dplyr::filter(stringr::str_detect(gene_name, paste(stringr::str_escape(name), collapse = "|"))) |>
     dplyr::group_by(gene_id) |>
     dplyr::summarise(
       gene_name = min(gene_name),
@@ -94,8 +94,8 @@ get_expression_data_by_gene_id <- function(
     dplyr::inner_join(tab_global_statistics, by = "unit") |>
     dplyr::filter(!is.na(tissue)) |>
     dplyr::mutate(
-      age_min = NA,
-      age_max = NA,
+      age_min = NA_real_,
+      age_max = NA_real_,
       ratio = sample_count / total_count,
       norm_value = (sample_count / total_count) / avg
     ) |>

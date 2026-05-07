@@ -10,7 +10,7 @@ PATH <- getwd()
 RELEASE <- "15_2"
 
 # load dependency functions ####
-# support function that builds the gene information look up tables
+# support function that builds the Bgee organ/age lookup tables (definition only)
 source(paste0(PATH, "/Code/03-helpers/helper_All_Bgee_organs.R"))
 source(paste0(PATH, "/Code/03-helpers/helper_SQL_Commands.R"))
 source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
@@ -25,8 +25,9 @@ options(timeout = 60 * 60 * 60)
 # Sys.setenv("http_proxy" = "http://PROXY:PORT")
 # Sys.setenv("ftp_proxy" = "http://PROXY:PORT")
 
-# define species for which to build the gene expression databases ####
-# Already loaded above in helper_Species.R
+# Build Bgee organ/age lookup tables (BgeeOrgans.txt, BgeeAges.txt) ####
+# These are cached in BgeeDBs/ and only need rebuilding when the Bgee release changes.
+build_bgee_lookup_tables(PATH)
 
 # Get gene annotation information ####
 # Human information needs to be added first,
@@ -105,8 +106,8 @@ foreach::foreach(
 parallel::stopCluster(cl)
 
 # Make databases for human  ####
-GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = TRUE)
-GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = FALSE)
+GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = TRUE,  RELEASE = RELEASE)
+GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = FALSE, RELEASE = RELEASE)
 
 # Compress ADME Databases for upload
 system("bash Code/05-utilities/helper_compress_DBs.sh")
