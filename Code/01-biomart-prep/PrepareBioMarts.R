@@ -147,6 +147,9 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     Monkey_PigTailed = {
       ensembl <- biomaRt::useMart("ensembl", dataset = "mnemestrina_gene_ensembl")
     },
+    Baboon_olive = {
+      ensembl <- biomaRt::useMart("ensembl", dataset = "panubis_gene_ensembl")
+    },
     Mouse = {
       ensembl <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
     },

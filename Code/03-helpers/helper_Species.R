@@ -1,6 +1,6 @@
 PharmaSpecies <- c(
   "Mouse", "Rat", "Rabbit", "Guineapig", "Dog", "Minipig",
-  "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed"
+  "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed", "Baboon_olive"
 )
 
 AnimalHealthSpecies <- c(

@@ -95,6 +95,10 @@ GeneratePKsimDB <- function(
       SPECIE_LAT <- "Macaca_nemestrina"
       DATASET <- "nnemestrina_gene_ensembl"
     },
+    Baboon_olive = {
+      SPECIE_LAT <- "Papio_anubis"
+      DATASET <- "panubis_gene_ensembl"
+    },
     Minipig = {
       SPECIE_LAT <- "Sus_scrofa"
       DATASET <- "sscrofa_gene_ensembl"

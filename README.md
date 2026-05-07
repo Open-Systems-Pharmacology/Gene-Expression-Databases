@@ -1,7 +1,9 @@
 # Gene-Expression-Databases
 
 Repository hosting the latest Gene Expression Databases to be used with PK-Sim.
-Databases are built from bulk RNA-Seq data provided by [Bgee](https://www.bgee.org/) (release 15.2) and cover 18 species including humans, preclinical pharmacological species, and animal health species.
+Databases are built from bulk RNA-Seq data provided by [Bgee](https://www.bgee.org/) (release 15.2) and cover 19 species including humans, preclinical pharmacological species, and animal health species.
+
+Build environment and package versions used for validated runs are documented in [docs/software-and-package-versions.md](docs/software-and-package-versions.md).
 
 Find the latest pre-built databases in the [releases section](https://github.com/Open-Systems-Pharmacology/Gene-Expression-Databases/releases).
 
@@ -10,7 +12,7 @@ Find the latest pre-built databases in the [releases section](https://github.com
 | Category | Species |
 |---|---|
 | **Human** | Human (*Homo sapiens*) |
-| **PharmaSpecies** | Mouse, Rat, Rabbit, Guinea pig, Dog, Minipig, Monkey (*M. mulatta*), Monkey (*M. fascicularis*), Monkey (Pig-tailed) |
+| **PharmaSpecies** | Mouse, Rat, Rabbit, Guinea pig, Dog, Minipig, Monkey (*M. mulatta*), Monkey (*M. fascicularis*), Monkey (Pig-tailed), Olive baboon (*Papio anubis*) |
 | **AnimalHealthSpecies** | Cattle, Horse, Cat, Chicken, Goat, Sheep, Turkey, Zebrafish |
 
 ## Data and Process Flow
@@ -38,7 +40,7 @@ The repository follows a structured pipeline to build PK-Sim expression database
 └─────────────────────────────────┘      └──────────────────────────────────┘
               │                                             │
               │ Output: BioMarts/All_Species_BioMarts.DB   │
-              │ (36 tables: Annotations + ADME per species) │
+              │ (38 tables: Annotations + ADME per species) │
               │                                             │
               └─────────────────────────┬───────────────────┘
                                         │
@@ -105,7 +107,9 @@ Steps 1–3 run in parallel for non-human species using `foreach + doParallel`:
 - All AnimalHealthSpecies process concurrently
 - Human processes separately (as basis for ortholog mapping)
 
-Each species generates 2 databases (ADME-only + full), so 18 species × 2 = 36 databases total.
+Each species generates 2 databases (ADME-only + full), so 19 species x 2 = 38 databases total.
+
+For the Olive baboon addition, the validated BioMart dataset is `panubis_gene_ensembl`, and the ADME-only PK-Sim database has been generated successfully for `Baboon_olive`.
 
 ---
 
@@ -183,7 +187,7 @@ GeneratePKsimDB(SPECIE = "Rat", ADME_ONLY = TRUE, RELEASE = "15_2", COMPUTE_IN_R
 GeneratePKsimDB(SPECIE = "Rat", ADME_ONLY = FALSE, RELEASE = "15_2", COMPUTE_IN_RAM = TRUE)
 ```
 
-Valid values for `SPECIE`: `Human`, `Mouse`, `Rat`, `Rabbit`, `Guineapig`, `Dog`, `Minipig`, `Monkey_mulatta`, `Monkey_fascicularis`, `Monkey_PigTailed`, `Cattle`, `Horse`, `Cat`, `Chicken`, `Goat`, `Sheep`, `Turkey`, `Zebrafish`
+Valid values for `SPECIE`: `Human`, `Mouse`, `Rat`, `Rabbit`, `Guineapig`, `Dog`, `Minipig`, `Monkey_mulatta`, `Monkey_fascicularis`, `Monkey_PigTailed`, `Baboon_olive`, `Cattle`, `Horse`, `Cat`, `Chicken`, `Goat`, `Sheep`, `Turkey`, `Zebrafish`
 
 ## Database Contents
 

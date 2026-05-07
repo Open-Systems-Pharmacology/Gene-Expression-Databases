@@ -44,6 +44,10 @@ build_bgee_lookup_tables <- function(PATH) {
         SPECIE_LAT <- "Macaca_nemestrina"
         DATASET <- "mnemestrina_gene_ensembl"
       },
+      Baboon_olive = {
+        SPECIE_LAT <- "Papio_anubis"
+        DATASET <- "panubis_gene_ensembl"
+      },
       Minipig = {
         SPECIE_LAT <- "Sus_scrofa"
         DATASET <- "sscrofa_gene_ensembl"
