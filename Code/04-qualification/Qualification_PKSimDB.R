@@ -51,14 +51,22 @@ colnames(container_mapping) <- c("container", "tissue")
 # ============================================================================
 message("Loading database connections...")
 
-# Old DB connection
+# Old DB connection - check multiple paths
 genedb_old_path <- file.path(PATH, "GENEDB_human.expressionDb")
-if (!file.exists(genedb_old_path)) {
-  warning("Old DB not found at: ", genedb_old_path)
-  genedb_old <- NULL
-} else {
+genedb_old_path_network <- "n:/FraProject/trial/cordesh/Developments/Gene-Expression-Databases/GENEDB_human.expressionDb"
+
+genedb_old <- NULL
+
+if (file.exists(genedb_old_path)) {
+  message("  Found Old DB at: ", genedb_old_path)
   genedb_old <- RSQLite::dbConnect(RSQLite::SQLite(), genedb_old_path)
   on.exit(RSQLite::dbDisconnect(genedb_old), add = TRUE)
+} else if (file.exists(genedb_old_path_network)) {
+  message("  Found Old DB at network path: ", genedb_old_path_network)
+  genedb_old <- RSQLite::dbConnect(RSQLite::SQLite(), genedb_old_path_network)
+  on.exit(RSQLite::dbDisconnect(genedb_old), add = TRUE)
+} else {
+  message("  Old DB not found (checked: ", genedb_old_path, " and network path)")
 }
 
 # New DB connection
@@ -71,16 +79,24 @@ if (!file.exists(genedb_new_path)) {
   on.exit(RSQLite::dbDisconnect(genedb_new), add = TRUE)
 }
 
-if (is.null(genedb_old) || is.null(genedb_new)) {
-  stop("One or both database files are missing. Cannot proceed with qualification.")
+if (is.null(genedb_new)) {
+  stop("New DB file is required. Cannot proceed with qualification.")
+}
+
+# Determine scenario
+SCENARIO_WITH_OLD_DB <- !is.null(genedb_old)
+
+if (!SCENARIO_WITH_OLD_DB) {
+  message("WARNING: Old DB not available. Using New DB only for qualification.")
 }
 
 # ============================================================================
 # LOAD & PROCESS OLD DB
 # ============================================================================
-message("Processing Old DB (fetal, RT-PCR)...")
+if (SCENARIO_WITH_OLD_DB) {
+  message("Processing Old DB (fetal, RT-PCR)...")
 
-x_old <- get_proteins_by_name(name = enzymes, conn = genedb_old)
+  x_old <- get_proteins_by_name(name = enzymes, conn = genedb_old)
 
 expression_values_old <- get_expression_data_by_gene_id(
   P_ID = x_old |>
@@ -113,6 +129,17 @@ expression_profile_old <- dplyr::left_join(
   dplyr::ungroup() |>
   dplyr::filter(unit == "RT-PCR")
 
+} else {
+  # Old DB unavailable - create empty dataframe
+  expression_profile_old <- tibble::tibble(
+    variant_name = character(),
+    container = character(),
+    unit = character(),
+    norm_value = numeric(),
+    Rel_Exp = numeric()
+  )
+}
+
 # ============================================================================
 # LOAD & PROCESS NEW DB
 # ============================================================================
@@ -121,6 +148,16 @@ message("Processing New DB (Bgee TPM)...")
 x_new <- get_proteins_by_name(name = enzymes, conn = genedb_new)
 x_new <- x_new |> dplyr::filter(gene_name %in% enzymes)
 
+# Determine age range for New DB query
+if (SCENARIO_WITH_OLD_DB && exists("expression_values_old") && nrow(expression_values_old) > 0) {
+  ages_min_new <- min(expression_values_old$age_min, na.rm = TRUE)
+  ages_max_new <- max(expression_values_old$age_max, na.rm = TRUE)
+} else {
+  # Use default ages if old DB not available
+  ages_min_new <- NULL
+  ages_max_new <- NULL
+}
+
 expression_values_new <- get_expression_data_by_gene_id(
   P_ID = x_new |>
     dplyr::filter(has_data == 1) |>
@@ -128,8 +165,8 @@ expression_values_new <- get_expression_data_by_gene_id(
     dplyr::pull(gene_id),
   conn = genedb_new,
   records_filter = NULL,
-  ages_min = min(expression_values_old$age_min, na.rm = TRUE),
-  ages_max = max(expression_values_old$age_max, na.rm = TRUE),
+  ages_min = ages_min_new,
+  ages_max = ages_max_new,
   unit_filter = NULL
 )
 
@@ -358,7 +395,6 @@ for (family in families) {
     dplyr::filter(variant_name %in% family_proteins)
 
   new_family <- expression_profile_new |>
-    dplyr::rename(variant_name = gene_name) |>
     dplyr::filter(variant_name %in% family_proteins)
 
   if (nrow(old_family) == 0 && nrow(new_family) == 0) {
@@ -384,12 +420,10 @@ summary_stats <- tibble::tibble()
 for (enzyme in enzymes) {
   old_enzyme <- expression_profile_old |> dplyr::filter(variant_name == enzyme)
   new_enzyme <- expression_profile_new |>
-    dplyr::rename(variant_name = gene_name) |>
     dplyr::filter(variant_name == enzyme)
 
   if (nrow(old_enzyme) > 0 || nrow(new_enzyme) > 0) {
-    stats <- compute_validation_stats(expression_profile_old, expression_profile_new |>
-      dplyr::rename(variant_name = gene_name), enzyme)
+    stats <- compute_validation_stats(expression_profile_old, expression_profile_new, enzyme)
     summary_stats <- dplyr::bind_rows(summary_stats, stats)
   }
 }
