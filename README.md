@@ -98,6 +98,26 @@ Each species produces two SQLite files (distributed as `.tar.gz`):
 | `GENEDB_{species}_ADME_ONLY_BgeeRelease_15_2.expressionDB` | ADME-relevant genes only (CYPs, UGTs, SLCs, ABCs, etc.) |
 | `GENEDB_{species}_BgeeRelease_15_2.expressionDB` | All genes with RNA-Seq data |
 
+### Large File Strategy (GitHub Release Assets)
+
+Some compressed databases can exceed GitHub's per-file push limit for git history. In those cases, publish the `.tar.gz` as a GitHub Release asset instead of committing it to the branch.
+
+Current case:
+
+- `PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz` is release-asset only.
+
+Use the helper script to create/update a release and upload the asset:
+
+```bash
+export GH_TOKEN="<github-token-with-repo-scope>"
+Code/helper_upload_release_asset.sh \
+  v3.0.2 \
+  "PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz" \
+  "OSP Expression DB v3.0.2"
+```
+
+The script creates a draft release if the tag does not already exist, then uploads the file as an asset.
+
 ### Database Schema
 
 The SQLite databases use the following key tables:
