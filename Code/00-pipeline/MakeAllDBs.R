@@ -113,10 +113,13 @@ GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = FALSE, RELE
 system("bash Code/05-utilities/helper_compress_DBs.sh")
 
 # Run technical validation that data from Bgee is correctly transfered to PK-Sim DB
-source(paste0(PATH, "/Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R"))
+source(paste0(PATH, "/Code/04-qualification/level1-technical-validation/Qualification_BgeeDB_2_PKSimDB.R"))
 
 # Run comparison between previous and new expression profiles of ADME genes in OSP-Model-Library
-source(paste0(PATH, "/Code/04-qualification/Qualification_PKSimDB.R"))
+source(paste0(PATH, "/Code/04-qualification/level2-human-old-vs-new/Qualification_PKSimDB.R"))
+
+# Run cross-species comparison for selected ADME genes in key preclinical species
+source(paste0(PATH, "/Code/04-qualification/level3-cross-species/Qualification_CrossSpecies.R"))
 
 # Clean up ####
 cat(

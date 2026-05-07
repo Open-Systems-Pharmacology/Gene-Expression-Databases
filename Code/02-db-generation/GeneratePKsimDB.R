@@ -72,7 +72,9 @@ GeneratePKsimDB <- function(
   }
 
   # is needed to allow download of human data (65 GB takes some time)
+  old_timeout <- getOption("timeout")
   options(timeout = 60 * 60 * 60)
+  on.exit(options(timeout = old_timeout), add = TRUE)
 
   #### Load experimental data from bgee ####
   # listBgeeSpecies(ordering = 1)
@@ -93,7 +95,7 @@ GeneratePKsimDB <- function(
     },
     Monkey_PigTailed = {
       SPECIE_LAT <- "Macaca_nemestrina"
-      DATASET <- "nnemestrina_gene_ensembl"
+      DATASET <- "mnemestrina_gene_ensembl"
     },
     Minipig = {
       SPECIE_LAT <- "Sus_scrofa"
@@ -156,8 +158,8 @@ GeneratePKsimDB <- function(
   )
 
   print(getwd())
-  dir.create("BgeeDBs/")
-  dir.create("PK-Sim DBs/")
+  dir.create(file.path(PATH, "BgeeDBs"), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path(PATH, "PK-Sim DBs"), recursive = TRUE, showWarnings = FALSE)
   old_wd <- setwd("BgeeDBs/")
   on.exit(setwd(old_wd), add = TRUE)
   print(paste0("Fetch Bgee expression data sets for ", SPECIE))
@@ -191,7 +193,7 @@ GeneratePKsimDB <- function(
   )
   PATH2PKsim <- paste0(PATH, "/PK-Sim DBs/", SPECIE, "/")
   PATH_DB_Bgee <- bgee[["pathToData"]]
-  dir.create(PATH2PKsim, showWarnings = TRUE)
+  dir.create(PATH2PKsim, recursive = TRUE, showWarnings = FALSE)
 
   #### Connections to local data bases ####
   print(paste0("Connect to local ", SPECIE, " bgee data base"))
