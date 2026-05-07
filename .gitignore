@@ -18,8 +18,8 @@ node_modules*
 *-Ex.R
 
 # Output files from R CMD build
-**.tar.gz
-**/PK-Sim DBs/**/**/*.tar.gz
+#**.tar.gz
+#**/PK-Sim DBs/**/**/*.tar.gz
 
 # Output files from R CMD check
 /*.Rcheck/
