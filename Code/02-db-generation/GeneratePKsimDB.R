@@ -30,25 +30,25 @@ GeneratePKsimDB <- function(
   ### Dependencies ####
   switch(RELEASE,
     "13_2" = {
-      simpleError("Code was discontiniued for Bgee release 13_2, try 15_2")
+      stop("Code was discontinued for Bgee release 13_2, try 15_2")
     },
     "14_0" = {
-      simpleError("Code was discontiniued for Bgee release 14_0, try 15_2")
+      stop("Code was discontinued for Bgee release 14_0, try 15_2")
     },
     "14_1" = {
-      simpleError("Code was discontiniued for Bgee release 14_1, try 15_2")
+      stop("Code was discontinued for Bgee release 14_1, try 15_2")
     },
     "14_2" = {
-      simpleError("Code was discontiniued for Bgee release 14_2, try 15_2")
+      stop("Code was discontinued for Bgee release 14_2, try 15_2")
     },
     "15_0" = {
-      simpleMessage("Code was not tested for for Bgee release 15_0")
+      message("Code was not tested for Bgee release 15_0")
     },
     "15_1" = {
-      simpleMessage("Code was not tested for for Bgee release 15_1")
+      message("Code was not tested for Bgee release 15_1")
     },
     "15_2" = {
-      simpleMessage("Code was tested for for Bgee release 15_2")
+      message("Code was tested for Bgee release 15_2")
     },
     {
       simpleMessage(
@@ -62,7 +62,7 @@ GeneratePKsimDB <- function(
   )
 
   # Test if input species is valid
-  source(paste0(PATH, "/Code/helper_Species.R"))
+  source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
 
   if (!SPECIE %in% ALL_SPECIE) {
     stop(paste0(
@@ -100,7 +100,7 @@ GeneratePKsimDB <- function(
       DATASET <- "sscrofa_gene_ensembl"
     },
     Dog = {
-      SPECIE_LAT <- "Canis_lupus familiaris"
+      SPECIE_LAT <- "Canis_lupus_familiaris"
       DATASET <- "cfamiliaris_gene_ensembl"
     },
     Mouse = {
@@ -158,7 +158,8 @@ GeneratePKsimDB <- function(
   print(getwd())
   dir.create("BgeeDBs/")
   dir.create("PK-Sim DBs/")
-  setwd("BgeeDBs/")
+  old_wd <- setwd("BgeeDBs/")
+  on.exit(setwd(old_wd), add = TRUE)
   print(paste0("Fetch Bgee expression data sets for ", SPECIE))
 
   # depending on RELEASE
@@ -201,6 +202,7 @@ GeneratePKsimDB <- function(
       synchronous = "off",
       cache_size = -1000
     )
+  on.exit(try(DBI::dbDisconnect(db_bgee_conn), silent = TRUE), add = TRUE)
   DB_Tables <- DBI::dbListTables(conn = db_bgee_conn)
 
   # local biomart DB
@@ -211,6 +213,7 @@ GeneratePKsimDB <- function(
       synchronous = "off",
       cache_size = -1000
     )
+  on.exit(try(DBI::dbDisconnect(db_biomart_conn), silent = TRUE), add = TRUE)
 
   # local pkSim DB
   print(paste0("Connect to local ", SPECIE, " PK-Sim DB"))
@@ -219,6 +222,7 @@ GeneratePKsimDB <- function(
     synchronous = "off",
     cache_size = -1000
   )
+  on.exit(try(DBI::dbDisconnect(db_PKsim_conn), silent = TRUE), add = TRUE)
 
   # If tables are empty they have been created but not filled with data
   if (rlang::is_empty(DB_Tables)) {
@@ -234,13 +238,18 @@ GeneratePKsimDB <- function(
     DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET "Anatomical.entity.name" = REPLACE("Anatomical.entity.name", \'"\', \'\')')
     DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET "Stage.name" = REPLACE("Stage.name", \'"\', \'\')')
     DBI::dbExecute(db_bgee_conn, 'UPDATE rna_seq SET Strain = REPLACE(Strain, \'"\', \'\')')
+    already_loaded <- TRUE
+  } else {
+    already_loaded <- FALSE
   }
 
   print("Re-organize data from BgeeDB for PK-Sim compatibility")
   if (COMPUTE_IN_RAM) {
     # as local table in RAM
-    print("Fetch expression data from local BgeeDB.")
-    rna_seq_selected <- BgeeDB::getSampleProcessedData(bgee)
+    if (!already_loaded) {
+      print("Fetch expression data from local BgeeDB.")
+      rna_seq_selected <- BgeeDB::getSampleProcessedData(bgee)
+    }
   } else {
     # as remote table
     rna_seq_selected <- dplyr::tbl(db_bgee_conn, "rna_seq")
@@ -384,7 +393,8 @@ GeneratePKsimDB <- function(
   if (COMPUTE_IN_RAM) {
     AnnotationTable <- dplyr::collect(AnnotationTable)
   } else {
-    AnnotationTable <- dplyr::tbl(db_bgee_conn, "AnnotationTable")
+    table_name <- if (ADME_ONLY) "AnnotationTable_ADME" else "AnnotationTable"
+    AnnotationTable <- dplyr::tbl(db_bgee_conn, table_name)
   }
 
   # Combine expression data and annotation information
@@ -472,7 +482,7 @@ GeneratePKsimDB <- function(
     name = "tpm_table",
     value = data.frame(tpm_table),
     overwrite = TRUE,
-    field.types = c(data_base_rec_id = "text", total_count = "bigint")
+    field.types = c(data_base_rec_id = "text", total_count = "real")
   )
 
   ### tab_expression_data_properties #
@@ -522,7 +532,7 @@ GeneratePKsimDB <- function(
     dplyr::left_join(dplyr::tbl(db_bgee_conn, "tab_gene_variants"), copy = TRUE) |>
     dplyr::left_join(dplyr::tbl(db_bgee_conn, "tab_expression_data_records_tmp"), copy = TRUE) |>
     dplyr::select(tidyselect::all_of(KEYS)) |>
-    dplyr::arrange("variant_id", "data_source_id") |>
+    dplyr::arrange(variant_id, data_source_id) |>
     dplyr::distinct() |>
     dplyr::collapse()
 
@@ -963,13 +973,13 @@ GeneratePKsimDB <- function(
   print(paste0("Write '", SPECIE, "' data into PK-Sim expression database"))
   assign(
     x = "tab_container_tissue",
-    value = tibble::tibble(read.table(paste0(PATH, "/Code/tab_container_tissue.txt"),
+    value = tibble::tibble(read.table(paste0(PATH, "/Code/03-helpers/tab_container_tissue.txt"),
       header = 1, sep = "\t", quote = '"'
     ))
   )
   assign(
     x = "tab_dts_properties",
-    value = tibble::tibble(read.table(paste0(PATH, "/Code/tab_dts_properties.txt"),
+    value = tibble::tibble(read.table(paste0(PATH, "/Code/03-helpers/tab_dts_properties.txt"),
       header = 1, sep = "\t"
     ))
   )
@@ -1040,15 +1050,12 @@ GeneratePKsimDB <- function(
   }
 
   print(paste0("Set table indizes for '", SPECIE, "\' PK-Sim expression database"))
-  for (i in 1:length(INDIZES)) { # if error occurs generate DB and show warning
+  for (i in seq_along(INDIZES)) { # if error occurs generate DB and show warning
     DBI::dbExecute(db_PKsim_conn, INDIZES[i])
   }
 
   print(paste0("Compress '", SPECIE, "' PK-Sim expression database"))
   DBI::dbExecute(conn = db_PKsim_conn, statement = "VACUUM") # clears pre-allocated disc space for db
-  DBI::dbDisconnect(db_biomart_conn)
-  DBI::dbDisconnect(db_PKsim_conn)
-  DBI::dbDisconnect(db_bgee_conn)
   gc() # clears used memory
-  setwd(here::here())
+  # DB connections and working directory are restored by on.exit() handlers
 }

@@ -57,7 +57,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
   #### Preparations ####
   # adding the various identifier and information is extremely memory
   # intensive and might only work with a 64-bit R version!
-  source(paste0(PATH, "/Code/helper_Species.R"))
+  source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
   # ALL_SPECIE <- c(
   #    "Mouse", "Rat", "Rabbit", "Guineapig", "Dog", "Minipig",
   #    "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed",

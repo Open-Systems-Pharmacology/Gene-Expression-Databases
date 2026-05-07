@@ -38,7 +38,7 @@ for (SPECIE in ALL_SPECIE) {
       DATASET <- "sscrofa_gene_ensembl"
     },
     Dog = {
-      SPECIE_LAT <- "Canis_lupus familiaris"
+      SPECIE_LAT <- "Canis_lupus_familiaris"
       DATASET <- "cfamiliaris_gene_ensembl"
     },
     Mouse = {
@@ -124,7 +124,8 @@ utils::write.table(
   file = "BgeeOrgans.txt",
   row.names = FALSE,
   sep = ";",
-  quote = FALSE
+  quote = FALSE,
+  append = FALSE
 )
 utils::write.table(
   Ages |>
@@ -134,7 +135,8 @@ utils::write.table(
   file = "BgeeAges.txt",
   row.names = FALSE,
   sep = ";",
-  quote = FALSE
+  quote = FALSE,
+  append = FALSE
 )
 setwd("../")
 # write.table(Organs, file = "BgeeAnnotations.txt", row.names = F)

@@ -11,11 +11,11 @@ RELEASE <- "15_2"
 
 # load dependency functions ####
 # support function that builds the gene information look up tables
-source(paste0(PATH, "/Code/helper_All_Bgee_organs.R"))
-source(paste0(PATH, "/Code/helper_SQL_Commands.R"))
-source(paste0(PATH, "/Code/helper_Species.R"))
-source(paste0(PATH, "/Code/PrepareBioMarts.R"))
-source(paste0(PATH, "/Code/GeneratePKsimDB.R")) # Main code
+source(paste0(PATH, "/Code/03-helpers/helper_All_Bgee_organs.R"))
+source(paste0(PATH, "/Code/03-helpers/helper_SQL_Commands.R"))
+source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
+source(paste0(PATH, "/Code/01-biomart-prep/PrepareBioMarts.R"))
+source(paste0(PATH, "/Code/02-db-generation/GeneratePKsimDB.R")) # Main code
 
 # set timeout to enable download of large files ####
 # is needed to allow download of large data sets
@@ -26,7 +26,7 @@ options(timeout = 60 * 60 * 60)
 # Sys.setenv("ftp_proxy" = "http://PROXY:PORT")
 
 # define species for which to build the gene expression databases ####
-source(paste0(PATH, "/Code/helper_Species.R"))
+# Already loaded above in helper_Species.R
 
 # Get gene annotation information ####
 # Human information needs to be added first,
@@ -44,7 +44,16 @@ for (Specie in AnimalHealthSpecies) {
 library(foreach)
 cl <- parallel::makePSOCKcluster(length(PharmaSpecies))
 doParallel::registerDoParallel(cl, cores = length(PharmaSpecies))
-foreach::foreach(mol = 1:length(PharmaSpecies)) %dopar% {
+foreach::foreach(
+  mol = seq_along(PharmaSpecies),
+  .export = c("PharmaSpecies", "RELEASE", "PATH",
+              "GeneratePKsimDB", "ALL_SPECIE",
+              "CREATE_TABLE", "VIEW_TABLE", "INDIZES"),
+  .packages = c("DBI", "RSQLite", "dplyr", "BgeeDB",
+                "biomaRt", "tibble", "readr",
+                "tidyr", "tidyselect", "stringr",
+                "rlang", "here")
+) %dopar% {
   Specie <- PharmaSpecies[mol]
   # for (Specie in PharmaSpecies) {
   GeneratePKsimDB(
@@ -67,7 +76,16 @@ library(foreach)
 # make PKsimDB for animal health species and their ADME genes ####
 cl <- parallel::makePSOCKcluster(length(AnimalHealthSpecies))
 doParallel::registerDoParallel(cl, cores = length(AnimalHealthSpecies))
-foreach::foreach(mol = 1:length(AnimalHealthSpecies)) %dopar% {
+foreach::foreach(
+  mol = seq_along(AnimalHealthSpecies),
+  .export = c("AnimalHealthSpecies", "RELEASE", "PATH",
+              "GeneratePKsimDB", "ALL_SPECIE",
+              "CREATE_TABLE", "VIEW_TABLE", "INDIZES"),
+  .packages = c("DBI", "RSQLite", "dplyr", "BgeeDB",
+                "biomaRt", "tibble", "readr",
+                "tidyr", "tidyselect", "stringr",
+                "rlang", "here")
+) %dopar% {
   Specie <- AnimalHealthSpecies[mol]
   # for (Specie in AnimalHealthSpecies) {
   GeneratePKsimDB(
@@ -91,13 +109,13 @@ GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = TRUE)
 GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = FALSE)
 
 # Compress ADME Databases for upload
-system("bash Code/helper_compress_DBs.sh")
+system("bash Code/05-utilities/helper_compress_DBs.sh")
 
 # Run technical validation that data from Bgee is correctly transfered to PK-Sim DB
-source("Code/Qualification_BgeeDB_2_PKSimDB.R")
+source(paste0(PATH, "/Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R"))
 
 # Run comparison between previous and new expression profiles of ADME genes in OSP-Model-Library
-source("Code/Qualification_PKSimDB.R")
+source(paste0(PATH, "/Code/04-qualification/Qualification_PKSimDB.R"))
 
 # Clean up ####
 cat(

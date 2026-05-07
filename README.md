@@ -13,6 +13,102 @@ Find the latest pre-built databases in the [releases section](https://github.com
 | **PharmaSpecies** | Mouse, Rat, Rabbit, Guinea pig, Dog, Minipig, Monkey (*M. mulatta*), Monkey (*M. fascicularis*), Monkey (Pig-tailed) |
 | **AnimalHealthSpecies** | Cattle, Horse, Cat, Chicken, Goat, Sheep, Turkey, Zebrafish |
 
+## Data and Process Flow
+
+The repository follows a structured pipeline to build PK-Sim expression databases. Below is the end-to-end data flow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     EXTERNAL DATA SOURCES                                   │
+│  ┌──────────────────┐                           ┌──────────────────────┐   │
+│  │ Ensembl BioMart  │                           │    Bgee RNA-Seq      │   │
+│  │   (Annotations)  │                           │     (Expression)     │   │
+│  └──────────────────┘                           └──────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+              │                                             │
+              ▼                                             ▼
+┌─────────────────────────────────┐      ┌──────────────────────────────────┐
+│   CODE/01-biomart-prep/         │      │   CODE/02-db-generation/         │
+│   PrepareBioMarts.R             │      │   GeneratePKsimDB.R              │
+│                                 │      │                                  │
+│ • Download species gene annot.  │      │ • Download TPM data from Bgee    │
+│ • Map NCBI / Ensembl / Symbol   │      │ • Join with BioMart annotations  │
+│ • Identify ADME genes           │      │ • Normalize to PK-Sim schema     │
+│ • Map human orthologs           │      │ • Create SQLite expression DB    │
+└─────────────────────────────────┘      └──────────────────────────────────┘
+              │                                             │
+              │ Output: BioMarts/All_Species_BioMarts.DB   │
+              │ (36 tables: Annotations + ADME per species) │
+              │                                             │
+              └─────────────────────────┬───────────────────┘
+                                        │
+                    ┌───────────────────▼───────────────────┐
+                    │   PK-Sim DBs/{Species}/               │
+                    │   GENEDB_{species}_*.expressionDB     │
+                    │                                       │
+                    │ Two variants per species:             │
+                    │ • ADME_ONLY (ADME genes only)        │
+                    │ • Full (all genes with data)         │
+                    └───────────────────┬───────────────────┘
+                                        │
+              ┌─────────────────────────┴─────────────────────────┐
+              │                                                   │
+              ▼                                                   ▼
+      ┌──────────────────┐                               ┌──────────────────┐
+      │   CODE/05-       │                               │   CODE/04-       │
+      │   utilities/     │                               │   qualification/ │
+      │                  │                               │                  │
+      │ • Compress to    │                               │ • Technical QC   │
+      │   .tar.gz        │                               │   (Bgee vs DB)   │
+      │ • Upload to      │                               │ • Biological QC  │
+      │   GitHub         │                               │   (ADME profiles)│
+      │   Release        │                               │                  │
+      └──────────────────┘                               └──────────────────┘
+              │                                                   │
+              ▼                                                   ▼
+      [Distribution]                                    [Validation Reports]
+```
+
+### Process Stages
+
+1. **Setup & Configuration** (`CODE/03-helpers/`)
+   - Species definitions (PharmaSpecies, AnimalHealthSpecies)
+   - SQL schema and view definitions
+   - Tissue-to-container mappings
+
+2. **BioMart Annotation Preparation** (`CODE/01-biomart-prep/PrepareBioMarts.R`)
+   - Downloads species-specific gene catalogs from Ensembl
+   - Maps gene identifiers (Ensembl ID, NCBI ID, gene symbol, synonyms)
+   - Identifies ADME-relevant genes (CYPs, UGTs, SLCs, ABCs, etc.)
+   - Maps human orthologs for cross-species homology
+   - Output: `BioMarts/All_Species_BioMarts.DB`
+
+3. **Expression Database Generation** (`CODE/02-db-generation/GeneratePKsimDB.R`)
+   - Downloads RNA-Seq TPM data from Bgee for each species
+   - Joins TPM data with BioMart annotations
+   - Normalizes to PK-Sim-compatible SQLite schema
+   - Generates both ADME-only and full-genome databases
+   - Output: `PK-Sim DBs/{Species}/GENEDB_{species}_*.expressionDB`
+
+4. **Quality Control & Validation** (`CODE/04-qualification/`)
+   - **Technical Qualification**: Confirms TPM values match source Bgee data
+   - **Biological Qualification**: Compares ADME expression profiles across releases
+
+5. **Distribution** (`CODE/05-utilities/`)
+   - Compresses ADME databases to `.tar.gz` for GitHub releases
+   - Uploads artifacts to GitHub Release pages
+
+### Parallel Execution
+
+Steps 1–3 run in parallel for non-human species using `foreach + doParallel`:
+- All PharmaSpecies process concurrently
+- All AnimalHealthSpecies process concurrently
+- Human processes separately (as basis for ortholog mapping)
+
+Each species generates 2 databases (ADME-only + full), so 18 species × 2 = 36 databases total.
+
+---
+
 ## How to Run
 
 ### Prerequisites
@@ -36,28 +132,28 @@ BiocManager::install(c("BgeeDB", "biomaRt"))
 
 ### Execution Order
 
-All scripts should be run from the repository root. The easiest way is to source `Code/MakeAllDBs.R` which orchestrates the full pipeline:
+All scripts should be run from the repository root. The easiest way is to source `Code/00-pipeline/MakeAllDBs.R` which orchestrates the full pipeline:
 
 ```r
 # Set the working directory to the repository root, then:
-source("Code/MakeAllDBs.R")
+source("Code/00-pipeline/MakeAllDBs.R")
 ```
 
 The pipeline runs in this order:
 
-1. **`Code/PrepareBioMarts.R`** — Downloads gene annotations from Ensembl BioMart for each species (Ensembl IDs, NCBI IDs, gene symbols, ortholog mappings). Human must be run first as it is the basis for homology mapping. Results are stored in `BioMarts/` as a SQLite annotation DB.
+1. **`Code/01-biomart-prep/PrepareBioMarts.R`** — Downloads gene annotations from Ensembl BioMart for each species (Ensembl IDs, NCBI IDs, gene symbols, ortholog mappings). Human must be run first as it is the basis for homology mapping. Results are stored in `BioMarts/` as a SQLite annotation DB.
 
-2. **`Code/GeneratePKsimDB.R`** — Main function. Downloads RNA-Seq TPM data from Bgee for a given species, maps it against the BioMart annotations, and writes a PK-Sim compatible SQLite expression database to `PK-Sim DBs/{Species}/`.
+2. **`Code/02-db-generation/GeneratePKsimDB.R`** — Main function. Downloads RNA-Seq TPM data from Bgee for a given species, maps it against the BioMart annotations, and writes a PK-Sim compatible SQLite expression database to `PK-Sim DBs/{Species}/`.
 
-3. **`Code/helper_compress_DBs.sh`** — Compresses each ADME-only database to `.tar.gz` for distribution.
+3. **`Code/05-utilities/helper_compress_DBs.sh`** — Compresses each ADME-only database to `.tar.gz` for distribution.
 
-4. **`Code/Qualification_BgeeDB_2_PKSimDB.R`** — Technical validation: confirms that TPM values in the generated PK-Sim DB match the raw Bgee source data for a reference experiment (GSE30611).
+4. **`Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R`** — Technical validation: confirms that TPM values in the generated PK-Sim DB match the raw Bgee source data for a reference experiment (GSE30611).
 
-5. **`Code/Qualification_PKSimDB.R`** — Biological validation: compares relative expression profiles of key ADME proteins (CYPs, ABCs, SLCs, UGTs) between the new DB and the previous release.
+5. **`Code/04-qualification/Qualification_PKSimDB.R`** — Biological validation: compares relative expression profiles of key ADME proteins (CYPs, ABCs, SLCs, UGTs) between the new DB and the previous release.
 
 ### Proxy / Timeout
 
-For large downloads (human dataset is ~65 GB), the timeout is set automatically to 3600 seconds. If you are behind a proxy, uncomment and set these lines at the top of `MakeAllDBs.R`:
+For large downloads (human dataset is ~65 GB), the timeout is set automatically to 3600 seconds. If you are behind a proxy, uncomment and set these lines at the top of `Code/00-pipeline/MakeAllDBs.R`:
 
 ```r
 Sys.setenv("http_proxy" = "http://PROXY:PORT")
@@ -73,9 +169,9 @@ library(here)
 setwd(here::here())
 PATH <- getwd()
 
-source("Code/PrepareBioMarts.R")
-source("Code/GeneratePKsimDB.R")
-source("Code/helper_Species.R")
+source("Code/03-helpers/helper_Species.R")
+source("Code/01-biomart-prep/PrepareBioMarts.R")
+source("Code/02-db-generation/GeneratePKsimDB.R")
 
 # Download gene annotations
 PrepareBioMarts(SPECIE = "Rat")
@@ -110,7 +206,7 @@ Use the helper script to create/update a release and upload the asset:
 
 ```bash
 export GH_TOKEN="<github-token-with-repo-scope>"
-Code/helper_upload_release_asset.sh \
+Code/05-utilities/helper_upload_release_asset.sh \
   v3.0.2 \
   "PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz" \
   "OSP Expression DB v3.0.2"
@@ -136,14 +232,14 @@ The SQLite databases use the following key tables:
 
 ### Querying the Database
 
-Helper functions are provided in `Code/helper_SQL_Queries.R`:
+Helper functions are provided in `Code/03-helpers/helper_SQL_Queries.R`:
 
 ```r
 library(DBI); library(RSQLite); library(dplyr)
 
 conn <- DBI::dbConnect(RSQLite::SQLite(), "PK-Sim DBs/Rat/GENEDB_rat_ADME_ONLY_BgeeRelease_15_2.expressionDB")
 
-source("Code/helper_SQL_Queries.R")
+source("Code/03-helpers/helper_SQL_Queries.R")
 
 # Find a gene by symbol, synonym, or other identifier
 genes <- get_proteins_by_name(name = c("Cyp3a2", "Cyp1a1"), conn = conn)
@@ -157,24 +253,43 @@ expr <- get_expression_data_by_gene_id(
 DBI::dbDisconnect(conn)
 ```
 
-## Code Structure
+## Code Organization
 
-| File | Purpose |
-|---|---|
-| `Code/MakeAllDBs.R` | Pipeline entry point — runs all species in parallel |
-| `Code/GeneratePKsimDB.R` | Core DB generation function |
-| `Code/PrepareBioMarts.R` | Gene annotation download and preparation |
-| `Code/helper_Species.R` | Defines species lists (`PharmaSpecies`, `AnimalHealthSpecies`, `ALL_SPECIE`) |
-| `Code/helper_SQL_Commands.R` | Table DDL, index definitions, SQL views |
-| `Code/helper_SQL_Queries.R` | Query helper functions for the output databases |
-| `Code/helper_All_Bgee_organs.R` | Organ/age export helpers |
-| `Code/helper_Relative_Expression.R` | Utility to extract relative expression by Ensembl ID |
-| `Code/helper_update_container_mapping.R` | Updates tissue-to-container mapping table |
-| `Code/helper_compress_DBs.sh` | Compresses ADME-only DBs to `.tar.gz` |
-| `Code/Qualification_BgeeDB_2_PKSimDB.R` | Validates Bgee source data == PK-Sim DB data |
-| `Code/Qualification_PKSimDB.R` | Compares ADME expression profiles old vs new DB |
-| `Code/tab_container_tissue.txt` | Static tissue-to-container mapping lookup |
-| `Code/tab_dts_properties.txt` | Static column metadata for PK-Sim UI |
+The `Code/` folder is organized by processing stage for clarity and maintainability:
+
+```
+Code/
+├── 00-pipeline/              # Main orchestration
+│   └── MakeAllDBs.R          # Pipeline entry point (runs all species)
+│
+├── 01-biomart-prep/          # BioMart annotation preparation
+│   └── PrepareBioMarts.R     # Download and prepare gene annotations
+│
+├── 02-db-generation/         # Core expression database generation
+│   └── GeneratePKsimDB.R     # Main DB generation function
+│
+├── 03-helpers/               # Core utilities and configuration
+│   ├── helper_Species.R      # Defines species lists and constants
+│   ├── helper_SQL_Commands.R # Table DDL, indices, view definitions
+│   ├── helper_SQL_Queries.R  # Query helpers for the databases
+│   ├── helper_All_Bgee_organs.R  # Organ/age extraction helpers
+│   ├── helper_Relative_Expression.R  # Expression profile utilities
+│   ├── tab_container_tissue.txt      # Tissue-to-container mapping
+│   └── tab_dts_properties.txt        # PK-Sim UI column metadata
+│
+├── 04-qualification/         # Quality control and validation
+│   ├── Qualification_BgeeDB_2_PKSimDB.R  # Technical validation
+│   └── Qualification_PKSimDB.R           # Biological validation
+│
+├── 05-utilities/             # Utilities and maintenance
+│   ├── helper_compress_DBs.sh    # Compress DBs to .tar.gz
+│   ├── helper_upload_release_asset.sh  # Upload to GitHub releases
+│   ├── helper_update_container_mapping.R   # Update tissue mappings
+│   ├── helper_update_indizes.R.r           # Index maintenance
+│   ├── helper_SQL_Queries.cs              # C# SQL helpers (legacy)
+│   ├── helper_compress_DBs_7zip.bat       # Windows compression alt
+│   └── Qualification/              # Additional QC data
+```
 
 ## Code of conduct
 Everyone interacting in the Open Systems Pharmacology community (codebases, issue trackers, chat rooms, mailing lists etc...) is expected to follow the Open Systems Pharmacology [code of conduct](https://github.com/Open-Systems-Pharmacology/Suite/blob/master/CODE_OF_CONDUCT.md).
