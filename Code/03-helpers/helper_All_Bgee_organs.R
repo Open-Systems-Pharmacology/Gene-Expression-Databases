@@ -17,11 +17,11 @@ build_bgee_lookup_tables <- function(PATH) {
 
   ALL_SPECIE_LOCAL <- c("Human", PharmaSpecies, AnimalHealthSpecies)
 
-  dir.create(file.path(PATH, "BgeeDBs"), showWarnings = FALSE)
+  dir.create(file.path(PATH, "BgeeDBs"), recursive = TRUE, showWarnings = FALSE)
   old_wd <- setwd(file.path(PATH, "BgeeDBs"))
   on.exit(setwd(old_wd), add = TRUE)
 
-  Organs <- tibble::tibble()
+
   Ages <- Organs
 
   for (SPECIE in ALL_SPECIE_LOCAL) {

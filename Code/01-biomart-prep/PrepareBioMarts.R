@@ -74,7 +74,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
   }
 
   # Create annotation database, if exist only connection is made
-  dir.create("./BioMarts/", showWarnings = FALSE)
+  dir.create("./BioMarts/", recursive = TRUE, showWarnings = FALSE)
 
   Conn <- DBI::dbConnect(
     drv = RSQLite::SQLite(),
@@ -114,7 +114,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     },
     Dog = {
       ensembl <- biomaRt::useMart("ensembl",
-        dataset = "clfamiliaris_gene_ensembl",
+        dataset = "cfamiliaris_gene_ensembl",
         host = "https://may2021.archive.ensembl.org"
       )
     },
