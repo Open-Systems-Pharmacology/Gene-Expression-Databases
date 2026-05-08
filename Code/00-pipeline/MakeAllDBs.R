@@ -44,6 +44,7 @@ for (Specie in AnimalHealthSpecies) {
 # run with foreach in parallel
 library(foreach)
 cl <- parallel::makePSOCKcluster(length(PharmaSpecies))
+on.exit(try(parallel::stopCluster(cl), silent = TRUE), add = TRUE)
 doParallel::registerDoParallel(cl, cores = length(PharmaSpecies))
 foreach::foreach(
   mol = seq_along(PharmaSpecies),
@@ -70,12 +71,11 @@ foreach::foreach(
     RELEASE = RELEASE
   )
 }
-# doParallel::stopImplicitCluster() #
-parallel::stopCluster(cl)
 # run with foreach in parallel
 library(foreach)
 # make PKsimDB for animal health species and their ADME genes ####
 cl <- parallel::makePSOCKcluster(length(AnimalHealthSpecies))
+on.exit(try(parallel::stopCluster(cl), silent = TRUE), add = TRUE)
 doParallel::registerDoParallel(cl, cores = length(AnimalHealthSpecies))
 foreach::foreach(
   mol = seq_along(AnimalHealthSpecies),
@@ -102,8 +102,6 @@ foreach::foreach(
     RELEASE = RELEASE
   )
 }
-# doParallel::stopImplicitCluster()
-parallel::stopCluster(cl)
 
 # Make databases for human  ####
 GeneratePKsimDB(SPECIE = "Human", COMPUTE_IN_RAM = TRUE, ADME_ONLY = TRUE,  RELEASE = RELEASE)
@@ -122,8 +120,5 @@ source(paste0(PATH, "/Code/04-qualification/level2-human-old-vs-new/Qualificatio
 source(paste0(PATH, "/Code/04-qualification/level3-cross-species/Qualification_CrossSpecies.R"))
 
 # Clean up ####
-cat(
-  "memory in storage: ", memory.size(),
-  " available memory: ", memory.size(max = TRUE), "\n"
-)
-gc()
+mem_info <- gc(reset = TRUE)
+cat("memory used: ", round(sum(mem_info[, 2]), 1), " Mb\n")

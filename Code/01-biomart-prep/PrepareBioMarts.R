@@ -81,9 +81,16 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     paste0("./BioMarts/All_Species_BioMarts.DB"),
     synchronous = NULL
   )
+  on.exit(try(DBI::dbDisconnect(Conn), silent = TRUE), add = TRUE)
   if (!DBI::dbExistsTable(conn = Conn, name = "Human_ADME") && SPECIE != "Human") {
-    print(paste0("Human annotation do not exist in 'All_Species_BioMarts.DB' \n Human data is loaded first."))
+    print("Human annotation does not exist in 'All_Species_BioMarts.DB'. Human data is loaded first.")
+    DBI::dbDisconnect(Conn)
     PrepareBioMarts("Human")
+    Conn <- DBI::dbConnect(
+      drv = RSQLite::SQLite(),
+      paste0("./BioMarts/All_Species_BioMarts.DB"),
+      synchronous = NULL
+    )
   }
 
   #### Load biomaRt data and store ####
@@ -164,7 +171,8 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
     },
     Zebrafish = {
       ensembl <- biomaRt::useMart("ensembl", dataset = "drerio_gene_ensembl", host = "https://oct2024.archive.ensembl.org")
-    }
+    },  
+    stop(paste0("No biomaRt dataset configured for SPECIE='", SPECIE, "'"))
   )
 
   #### Select annotation information and identifiers; mapping ortholog genes  ####
