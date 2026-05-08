@@ -48,3 +48,6 @@ node_modules*
 PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz
 # Archive folder for old/redundant files
 .archive/
+
+# Local development context (not part of repo)
+memory-bank/
