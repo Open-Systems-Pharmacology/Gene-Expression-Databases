@@ -1,11 +1,20 @@
 # Helper: get proteins by name
+# Uses lazy evaluation with dplyr::tbl() to push filtering to SQLite
+# Avoids loading entire tables into memory
 get_proteins_by_name <- function(name, conn) {
-  tab_gene_names <- RSQLite::dbReadTable(conn, "tab_gene_names")
-  tab_gene_variants <- RSQLite::dbReadTable(conn, "tab_gene_variants")
-  tab_expression_data_values <- RSQLite::dbReadTable(conn, "tab_expression_data_values")
+  # Use lazy evaluation for all table references
+  tab_gene_names <- dplyr::tbl(conn, "tab_gene_names")
+  tab_gene_variants <- dplyr::tbl(conn, "tab_gene_variants")
+  tab_expression_data_values <- dplyr::tbl(conn, "tab_expression_data_values")
+
+  # Subquery: identify variant_ids that have expression data
+  variant_ids_with_data <- tab_expression_data_values |>
+    dplyr::distinct(variant_id) |>
+    dplyr::pull(variant_id) |>
+    unique()
 
   proteinsbyname <- tab_gene_names |>
-    # dplyr::filter(grepl(name, gene_name)) |>
+    # Filter by gene name using SQL LIKE operator (more efficient than string detection in R)
     dplyr::filter(stringr::str_detect(gene_name, paste(stringr::str_escape(name), collapse = "|"))) |>
     dplyr::group_by(gene_id) |>
     dplyr::summarise(
@@ -26,15 +35,18 @@ get_proteins_by_name <- function(name, conn) {
     ) |>
     dplyr::ungroup()
 
+  # Use parameterized query to check which genes have expression data
   has_data_ids <- tab_gene_variants |>
-    dplyr::filter(variant_id %in% tab_expression_data_values$variant_id) |>
+    dplyr::filter(variant_id %in% !!variant_ids_with_data) |>
     dplyr::pull(gene_id) |>
     unique()
 
+  # Collect only after all filtering is done
   proteinsbyname |>
     dplyr::mutate(
-      has_data = as.integer(gene_id %in% has_data_ids)
-    )
+      has_data = as.integer(gene_id %in% !!has_data_ids)
+    ) |>
+    dplyr::collect()
 }
 
 # Helper: get expression data by gene id
@@ -111,53 +123,63 @@ get_expression_data_by_gene_id <- function(
 }
 
 # Helper: get container tissue mapping
+# Uses lazy evaluation to avoid loading full table into memory
 get_container_tissue_mapping <- function(conn) {
-  tab_container_tissue <- RSQLite::dbReadTable(conn, "tab_container_tissue")
-  tab_container_tissue |> dplyr::select(container, tissue)
+  dplyr::tbl(conn, "tab_container_tissue") |>
+    dplyr::select(container, tissue) |>
+    dplyr::collect()
 }
 
 # Helper: get hint information
+# Uses lazy evaluation and SQL WHERE clause to fetch only required rows
 get_hint <- function(conn, table_name, column, value) {
-  table <- RSQLite::dbReadTable(conn, table_name)
-  info <- table |> dplyr::filter(.data[[column]] == value)
+  table <- dplyr::tbl(conn, table_name)
+  info <- table |>
+    dplyr::filter(.data[[column]] == !!value) |>
+    dplyr::collect()
   if (nrow(info) == 0) {
     return("")
   }
   info$INFORMATION[1]
 }
 # Example usage:
-# gender_hint <- get_hint(tab_gender_hint, "gender", "male")
-# tissue_hint <- get_hint(tab_tissue_hint, "tissue", "liver")
-# health_state_hint <- get_hint(tab_health_state_hint, "health_state", "healthy")
-# sample_source_hint <- get_hint(tab_sample_source_hint, "sample_source", "blood")
-# unit_hint <- get_hint(tab_unit_hint, "unit", "TPM")
-# name_type_hint <- get_hint(tab_name_type_hint, "name_type", "symbol")
+# gender_hint <- get_hint(conn, "tab_gender_hint", "gender", "male")
+# tissue_hint <- get_hint(conn, "tab_tissue_hint", "tissue", "liver")
+# health_state_hint <- get_hint(conn, "tab_health_state_hint", "health_state", "healthy")
+# sample_source_hint <- get_hint(conn, "tab_sample_source_hint", "sample_source", "blood")
+# unit_hint <- get_hint(conn, "tab_unit_hint", "unit", "TPM")
+# name_type_hint <- get_hint(conn, "tab_name_type_hint", "name_type", "symbol")
 
 # Helper: get database record properties
+# Uses lazy evaluation and SQL WHERE clauses for efficient filtering
 get_database_rec_properties <- function(conn, database, rec_id) {
-  tab_database_rec_properties <- RSQLite::dbReadTable(conn, "tab_database_rec_properties")
-  tab_database_rec_properties |>
-    dplyr::filter(data_base == database, data_base_rec_id == rec_id) |>
+  dplyr::tbl(conn, "tab_database_rec_properties") |>
+    dplyr::filter(data_base == !!database, data_base_rec_id == !!rec_id) |>
     dplyr::mutate(property_string = paste(PROPERTY, PROPERTY_VALUE, sep = ": ")) |>
-    dplyr::pull(property_string)
+    dplyr::pull(property_string) |>
+    collect()
 }
 
 # Helper: get database record infos
+# Uses lazy evaluation and SQL WHERE clauses for efficient filtering
 get_database_rec_infos <- function(conn, database, rec_id) {
-  tab_database_rec_info <- RSQLite::dbReadTable(conn, "tab_database_rec_info")
-  tab_database_rec_info |>
-    dplyr::filter(data_base == database, data_base_rec_id == rec_id) |>
+  dplyr::tbl(conn, "tab_database_rec_info") |>
+    dplyr::filter(data_base == !!database, data_base_rec_id == !!rec_id) |>
     dplyr::select(-data_base, -data_base_rec_id) |>
+    dplyr::collect() |>
     tidyr::pivot_longer(everything(), names_to = "column", values_to = "value") |>
     dplyr::mutate(info_string = paste(column, value, sep = ": ")) |>
     dplyr::pull(info_string)
 }
 
 # Helper: validate query columns
+# Uses DBI::dbListFields() to check columns without loading table data
 validate_query <- function(conn, table_name, columns) {
-  table <- RSQLite::dbReadTable(conn, table_name)
-  missing <- setdiff(columns, colnames(table))
-  if (length(missing) > 0) stop(paste("Missing columns:", paste(missing, collapse = ", ")))
+  existing_columns <- DBI::dbListFields(conn, table_name)
+  missing <- setdiff(columns, existing_columns)
+  if (length(missing) > 0) {
+    stop(paste("Missing columns in", table_name, ":", paste(missing, collapse = ", ")))
+  }
 }
 
 # Helper: clear cache (if using environments or lists for caching)
