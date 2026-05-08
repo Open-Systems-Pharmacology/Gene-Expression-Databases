@@ -32,7 +32,7 @@ utils::globalVariables(c(
 #'   - Filters for ADME genes using curated lists from multiple sources.
 #'   - Stores results in a database for efficient downstream analysis.
 #'
-PrepareBioMarts <- function(SPECIE = "Rat") {
+PrepareBioMarts <- function(SPECIE) {
   # Function is designed to download species gene annotation and store the information (as RDS & DB files)
   # The information is needed to:
   #  1. Estimate RPKM from other RNAseq data (gene length needed; https://www.rna-seqblog.com/rpkm-fpkm-and-tpm-clearly-explained/)
