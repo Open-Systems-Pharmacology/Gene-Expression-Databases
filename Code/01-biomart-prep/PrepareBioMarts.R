@@ -74,7 +74,7 @@ PrepareBioMarts <- function(SPECIE = "Rat") {
   }
 
   # Create annotation database, if exist only connection is made
-  dir.create("./BioMarts/", showWarnings = FALSE)
+  dir.create("./BioMarts/", recursive = TRUE, showWarnings = FALSE)
 
   Conn <- DBI::dbConnect(
     drv = RSQLite::SQLite(),

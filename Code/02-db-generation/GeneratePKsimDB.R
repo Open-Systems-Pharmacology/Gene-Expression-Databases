@@ -103,7 +103,7 @@ GeneratePKsimDB <- function(
     },
     Dog = {
       SPECIE_LAT <- "Canis_lupus_familiaris"
-      DATASET <- "cfamiliaris_gene_ensembl"
+      DATASET <- "clfamiliaris_gene_ensembl"
     },
     Mouse = {
       SPECIE_LAT <- "Mus_musculus"
