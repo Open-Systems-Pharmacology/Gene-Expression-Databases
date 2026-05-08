@@ -28,11 +28,7 @@ Code/04-qualification/
 │       └── 03_plots/             # Cross-species gene plots
 │
 ├── DESCRIPTION                   # R package requirements specification
-├── renv.lock                     # R environment lock file (all package versions)
-│
-├── Qualification_BgeeDB_2_PKSimDB.R    # Wrapper: runs Level 1 validation
-├── Qualification_PKSimDB.R             # Wrapper: runs Level 2 validation
-└── Qualification_CrossSpecies.R        # Wrapper: runs Level 3 validation
+└── renv.lock                     # R environment lock file (all package versions)
 ```
 
 ## Validation Levels
@@ -48,8 +44,6 @@ Code/04-qualification/
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R")
-# or directly:
 source("Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R")
 ```
 
@@ -66,8 +60,6 @@ source("Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R")
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_PKSimDB.R")
-# or directly:
 source("Code/04-qualification/scripts/Qualification_PKSimDB.R")
 ```
 
@@ -84,8 +76,6 @@ source("Code/04-qualification/scripts/Qualification_PKSimDB.R")
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_CrossSpecies.R")
-# or directly:
 source("Code/04-qualification/scripts/Qualification_CrossSpecies.R")
 ```
 
@@ -140,13 +130,13 @@ renv::restore("Code/04-qualification/renv.lock")
 cd /path/to/Gene-Expression-Databases
 
 # Level 1: Technical validation (Bgee → OSP integration)
-Rscript Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R
+Rscript Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R
 
 # Level 2: Biological validation (Old vs New DB)
-Rscript Code/04-qualification/Qualification_PKSimDB.R
+Rscript Code/04-qualification/scripts/Qualification_PKSimDB.R
 
 # Level 3: Cross-species validation
-Rscript Code/04-qualification/Qualification_CrossSpecies.R
+Rscript Code/04-qualification/scripts/Qualification_CrossSpecies.R
 ```
 
 ### Run from Within R
@@ -154,13 +144,13 @@ Rscript Code/04-qualification/Qualification_CrossSpecies.R
 setwd("/path/to/Gene-Expression-Databases")
 
 # Level 1
-source("Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R")
 
 # Level 2
-source("Code/04-qualification/Qualification_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_PKSimDB.R")
 
 # Level 3
-source("Code/04-qualification/Qualification_CrossSpecies.R")
+source("Code/04-qualification/scripts/Qualification_CrossSpecies.R")
 ```
 
 ---
