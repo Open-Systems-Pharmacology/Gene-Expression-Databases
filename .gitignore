@@ -1,0 +1,53 @@
+# VSCode files
+node_modules*
+.vscode
+.vscode/*.json
+
+# History files
+.Rhistory
+.Rapp.history
+
+# Session Data files
+.RData
+.RDataTmp
+
+# User-specific files
+.Ruserdata
+
+# Example code in package build process
+*-Ex.R
+
+# Output files from R CMD build
+#**.tar.gz
+#**/PK-Sim DBs/**/**/*.tar.gz
+
+# Output files from R CMD check
+/*.Rcheck/
+
+# RStudio files
+.Rproj.user/
+*.Rproj
+
+# OAuth2 token
+.httr-oauth
+
+# R Environment Variables
+.Renviron
+
+# local expression data files
+*Bgee_*/*
+**/BgeeDBs/**/*.tsv
+
+# local non compressed DBs
+*.DB
+*.db
+*.expressionDB
+*.expressionDb
+
+# Large artifacts published via GitHub Releases (not tracked in git history)
+PK-Sim DBs/Mouse/GENEDB_mouse_ADME_ONLY_BgeeRelease_15_2.expressionDB.tar.gz
+# Archive folder for old/redundant files
+.archive/
+
+# Local development context (not part of repo)
+memory-bank/
