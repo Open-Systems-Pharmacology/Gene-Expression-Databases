@@ -19,7 +19,7 @@ source(paste0(PATH, "/Code/02-db-generation/GeneratePKsimDB.R")) # Main code
 
 # set timeout to enable download of large files ####
 # is needed to allow download of large data sets
-options(timeout = 60 * 60 * 60)
+options(timeout = 60 * 60 * 2)  # 2 hours — sufficient for large Bgee downloads
 
 # depending on your system you might need to set a proxy to enable data download
 # Sys.setenv("http_proxy" = "http://PROXY:PORT")
