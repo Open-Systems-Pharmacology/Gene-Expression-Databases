@@ -284,41 +284,61 @@ if (!is.null(GSE30611_ERX011211_OSP_DB)) {
 
 } else {
   # ============================================================================
-  # SCENARIO 2: OSP DB Unavailable - Create Bgee overview plots with all samples
+  # SCENARIO 2: Create X-Y plots of Expression Rank vs TPM
   # ============================================================================
-  message("  OSP DB unavailable: Creating Bgee-focused overview plots")
+  message("  Creating Bgee X-Y validation plots (Rank vs TPM) by gene family")
 
-  # Generate distribution plots by family
   for (family in families_to_plot) {
-    family_data <- bgee_classified |> dplyr::filter(Gene_Family == family)
-
+    family_data <- bgee_classified |>
+      dplyr::filter(Gene_Family == family, !is.na(TPM), TPM > 0) |>
+      dplyr::arrange(desc(TPM)) |>
+      dplyr::mutate(Gene_Rank = row_number())
+    
     if (nrow(family_data) == 0) {
       message("    Skipping ", family, " (no data)")
       next
     }
-
-    n_unique_genes <- length(unique(family_data$symbol))
-    message("    Plotting ", family, " (", n_unique_genes, " genes)")
-
-    # Create scatter plot: TPM vs Detection Flag colored by gene
-    p <- ggplot2::ggplot(family_data, ggplot2::aes(x = TPM, y = Detection.flag)) +
-      ggplot2::geom_jitter(
-        height = 0.15,
-        width = 0,
-        size = 2.5,
-        alpha = 0.5,
+    
+    message("    Plotting ", family, " (", nrow(family_data), " genes)")
+    
+    # Create X-Y scatter plot: Rank vs TPM
+    p <- ggplot2::ggplot(family_data, ggplot2::aes(x = Gene_Rank, y = TPM)) +
+      ggplot2::geom_point(
         color = family_colors[family],
+        size = 3.5,
+        alpha = 0.6,
+        stroke = 0.5,
         shape = 21,
         fill = family_colors[family]
       ) +
-      ggplot2::scale_x_log10(
+      ggrepel::geom_label_repel(
+        ggplot2::aes(label = symbol),
+        size = 2.2,
+        max.overlaps = 15,
+        alpha = 0.9,
+        label.size = 0.15,
+        label.padding = ggplot2::unit(0.12, "lines"),
+        box.padding = ggplot2::unit(0.3, "lines"),
+        point.padding = ggplot2::unit(0.2, "lines"),
+        fill = "white",
+        color = "gray15"
+      ) +
+      ggplot2::geom_smooth(
+        method = "loess",
+        se = FALSE,
+        color = "gray40",
+        linetype = "dashed",
+        linewidth = 0.6,
+        alpha = 0.5
+      ) +
+      ggplot2::scale_y_log10(
         labels = scales::trans_format("log10", scales::math_format(10^.x))
       ) +
       ggplot2::labs(
-        title = paste("Technical Overview:", family),
-        subtitle = "Bgee GSE30611 ERX011211 | All Detection Flags",
-        x = "TPM (log10)",
-        y = "Detection Flag"
+        title = paste("Technical Validation:", family),
+        subtitle = "Bgee GSE30611 ERX011211 | Expression Rank vs Level",
+        x = "Expression Rank (highest to lowest)",
+        y = "TPM (log10)"
       ) +
       ggplot2::theme_minimal(base_size = 11) +
       ggplot2::theme(
@@ -326,20 +346,21 @@ if (!is.null(GSE30611_ERX011211_OSP_DB)) {
         plot.subtitle = ggplot2::element_text(size = 10, color = "gray40", hjust = 0.5),
         axis.title = ggplot2::element_text(face = "bold", size = 10),
         axis.text = ggplot2::element_text(size = 9),
-        panel.grid.major = ggplot2::element_line(color = "gray90", size = 0.2),
+        panel.grid.major = ggplot2::element_line(color = "gray90", linewidth = 0.2),
+        panel.grid.minor = ggplot2::element_line(color = "gray95", linewidth = 0.1),
         plot.margin = ggplot2::margin(t = 10, r = 10, b = 10, l = 10)
       )
-
+    
     family_filename <- tolower(gsub("/", "_", family))
-    plot_path <- file.path(plots_dir, paste0("technical_bgee_overview_", family_filename, ".png"))
-    ggplot2::ggsave(plot_path, p, width = 8, height = 6, dpi = 300, bg = "white")
+    plot_path <- file.path(plots_dir, paste0("technical_validation_xy_", family_filename, ".png"))
+    ggplot2::ggsave(plot_path, p, width = 8, height = 7, dpi = 300, bg = "white")
     message("      Saved: ", plot_path)
   }
 
-  # Export Bgee overview data
-  overview_file <- file.path(data_dir, "technical_bgee_overview.csv")
+  # Export Bgee validation data
+  overview_file <- file.path(data_dir, "technical_validation_data.csv")
   readr::write_csv(bgee_classified, overview_file)
-  message("Exported Bgee overview: ", overview_file)
+  message("Exported Bgee validation data: ", overview_file)
 }
 
 message("\nTechnical qualification complete!")
