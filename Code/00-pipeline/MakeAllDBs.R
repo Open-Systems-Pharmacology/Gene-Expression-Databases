@@ -32,12 +32,30 @@ build_bgee_lookup_tables(PATH)
 # Get gene annotation information ####
 # Human information needs to be added first,
 # is the basis for gene homology of other species
-PrepareBioMarts(SPECIE = "Human")
-for (Specie in PharmaSpecies) {
-  PrepareBioMarts(SPECIE = Specie)
+biomart_db <- file.path(PATH, "BioMarts", "All_Species_BioMarts.DB")
+expected_tables <- c(
+  paste0(ALL_SPECIE, "_Annotations"),
+  paste0(ALL_SPECIE, "_ADME")
+)
+biomart_cache_complete <- FALSE
+
+if (file.exists(biomart_db)) {
+  biomart_conn <- DBI::dbConnect(RSQLite::SQLite(), biomart_db, synchronous = NULL)
+  on.exit(try(DBI::dbDisconnect(biomart_conn), silent = TRUE), add = TRUE)
+  existing_tables <- DBI::dbListTables(biomart_conn)
+  biomart_cache_complete <- all(expected_tables %in% existing_tables)
 }
-for (Specie in AnimalHealthSpecies) {
-  PrepareBioMarts(SPECIE = Specie)
+
+if (biomart_cache_complete) {
+  message("BioMart cache already complete for all species; skipping PrepareBioMarts().")
+} else {
+  PrepareBioMarts(SPECIE = "Human")
+  for (Specie in PharmaSpecies) {
+    PrepareBioMarts(SPECIE = Specie)
+  }
+  for (Specie in AnimalHealthSpecies) {
+    PrepareBioMarts(SPECIE = Specie)
+  }
 }
 
 # make PKsimDB for pharmacological species and their ADME genes ####
