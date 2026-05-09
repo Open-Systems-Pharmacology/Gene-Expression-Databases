@@ -109,6 +109,63 @@ Each species generates 2 databases (ADME-only + full), so 18 species × 2 = 36 d
 
 ---
 
+## PR and Automation Guardrails (OSP / Bgee / BioMart)
+
+These guardrails are intended to keep generated databases reproducible and mapping behavior stable across releases.
+
+### Non-Negotiable Rules
+
+1. **Pin Bgee release assumptions**
+   - Bgee release changes must be explicit in code, documentation, and output naming.
+   - No implicit fallback to "latest" source behavior.
+
+2. **Protect BioMart mapping stability**
+   - Use explicit host/version selection for production logic.
+   - Fallback hosts are allowed only with explicit version/assembly guard validation.
+   - Never accept silent mapping drift after host changes.
+
+3. **Keep species mapping complete**
+   - Changes affecting dataset definitions must cover all supported species.
+   - Validate dataset existence and key attributes before full production runs.
+
+4. **Respect ontology-sensitive mapping**
+   - Tissue/container mapping changes must document expected impact and validation evidence.
+
+### Required PR Evidence (for Bgee/BioMart/Mapping changes)
+
+Include the following in the PR description:
+
+1. **Pinned inputs**
+   - Bgee release, Ensembl/BioMart host(s), expected version/assembly assumptions.
+
+2. **Validation run summary**
+   - Species coverage checked.
+   - Version-guard/fallback checks passed.
+   - Representative functional species checks listed.
+
+3. **Behavior statement**
+   - State whether behavior is unchanged or intentionally changed.
+   - If changed, explain downstream qualification impact.
+
+### Automation Recommendations
+
+1. Keep validation checks scriptable and deterministic (avoid manual-only verification).
+2. Prefer dedicated utility scripts for version-guard and species coverage checks.
+3. Keep generated run artifacts out of logic PRs unless explicitly needed as review evidence.
+4. For GitHub Actions in this repository, use:
+   - `runs-on: ['atmos-aws-arc-runner-set']`
+
+### Suggested PR Checklist
+
+- [ ] Bgee release assumptions are explicit.
+- [ ] BioMart host/version pinning is explicit.
+- [ ] Fallback logic has assembly/version guards.
+- [ ] Affected species mappings were validated.
+- [ ] Qualification impact was assessed.
+- [ ] Documentation was updated where behavior changed.
+
+---
+
 ## How to Run
 
 ### Prerequisites

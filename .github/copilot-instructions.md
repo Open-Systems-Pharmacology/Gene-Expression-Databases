@@ -201,3 +201,69 @@ User Instructions:
 - **Documentation:** All projects must have a clear `README.md` with setup, usage, and support contacts.
 - **Onboarding:** Include a `CONTRIBUTING.md` for how to contribute, and a `CODEOWNERS` file if possible.
 - **Naming Conventions:** Follow company naming conventions for resources, variables, and files.
+
+# Gene-Expression-Databases Project Guardrails (OSP + Bgee + BioMart)
+
+## Scope
+These rules are repository-specific and must be followed for all PRs and automation touching:
+- `Code/01-biomart-prep/`
+- `Code/02-db-generation/`
+- `Code/03-helpers/`
+- `Code/04-qualification/`
+- `Code/05-utilities/`
+
+## Source-of-Truth Rules
+
+1. **Bgee release pinning is mandatory**
+   - Treat Bgee release as a reproducibility boundary.
+   - Do not switch to "latest" behavior implicitly.
+   - Any Bgee release update must be explicit in code, docs, and outputs.
+
+2. **BioMart mapping must be release/assembly-safe**
+   - Prefer explicit host/version selection for production queries.
+   - If fallback hosts are used, accept fallback results only when expected version/assembly guards match.
+   - Never silently accept mapping drift after host changes.
+
+3. **Species mapping completeness is required**
+   - Species dataset definitions must stay complete for all supported species.
+   - Dataset existence/attribute availability should be validated before full runs.
+
+4. **Ontology-aware mapping behavior must stay stable**
+   - Changes to tissue/container mapping or annotation interpretation must document expected effects.
+   - Cross-species mapping logic should not be altered without explicit validation evidence.
+
+## PR Requirements
+
+1. **Every PR must state scope category**
+   - `core-sql-memory`, `biomart-mapping`, `qualification`, `docs`, or combinations.
+
+2. **Every BioMart/Bgee-affecting PR must include evidence**
+   - What was pinned (host/release/dataset assumptions)
+   - What was validated (species coverage, version guards, representative functional checks)
+   - Why behavior is unchanged or intentionally changed
+
+3. **Do not mix unrelated generated artifacts into logic PRs**
+   - Keep run outputs out of PRs unless explicitly required for review evidence.
+
+4. **Backwards compatibility is default**
+   - For ID mapping and annotation fields, preserve interfaces unless the PR explicitly documents a breaking change.
+
+## Automation Requirements
+
+1. **Run validation scripts for mapping-critical changes**
+   - Use repository utilities for BioMart version guard validation when relevant.
+
+2. **Prefer deterministic checks over ad hoc checks**
+   - Add scripted checks for species coverage and version/assembly guards.
+
+3. **GitHub Actions runner policy**
+   - All new or modified GitHub Actions workflows must use:
+     - `runs-on: ['atmos-aws-arc-runner-set']`
+
+## Review Checklist (Required for relevant PRs)
+
+- Bgee release assumptions are explicit and unchanged (or intentionally updated)
+- BioMart host/version pinning and fallback guard logic are explicit
+- All affected species dataset mappings were verified
+- Qualification impact is assessed (technical and biological)
+- Documentation is updated for any rule/behavior change
