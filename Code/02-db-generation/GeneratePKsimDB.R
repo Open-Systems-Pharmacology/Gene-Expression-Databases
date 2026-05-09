@@ -73,7 +73,7 @@ GeneratePKsimDB <- function(
 
   # is needed to allow download of human data (65 GB takes some time)
   old_timeout <- getOption("timeout")
-  options(timeout = 60 * 60 * 60)
+  options(timeout = 60 * 60 * 2)
   on.exit(options(timeout = old_timeout), add = TRUE)
 
   #### Load experimental data from bgee ####

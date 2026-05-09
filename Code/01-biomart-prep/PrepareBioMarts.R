@@ -122,12 +122,7 @@ PrepareBioMarts <- function(SPECIE) {
         if (!is.null(connection)) {
           if (!is.null(expected_version_pattern)) {
             ds_info <- tryCatch({
-              meta_mart <- if (is.na(host)) {
-                biomaRt::useMart("ensembl")
-              } else {
-                biomaRt::useMart("ensembl", host = host)
-              }
-              biomaRt::listDatasets(meta_mart)
+              biomaRt::listDatasets(connection)
             }, error = function(e) {
               last_error <<- conditionMessage(e)
               NULL
@@ -144,8 +139,7 @@ PrepareBioMarts <- function(SPECIE) {
                 "Dataset '", dataset, "' not listed on host ",
                 ifelse(is.na(host), "<default>", host)
               )
-              Sys.sleep(2 * attempt)
-              next
+              break
             }
 
             if (!grepl(expected_version_pattern, ds_row$version[1], ignore.case = TRUE)) {
@@ -153,8 +147,7 @@ PrepareBioMarts <- function(SPECIE) {
                 "Dataset '", dataset, "' version '", ds_row$version[1],
                 "' does not match expected pattern '", expected_version_pattern, "'"
               )
-              Sys.sleep(2 * attempt)
-              next
+              break
             }
           }
 

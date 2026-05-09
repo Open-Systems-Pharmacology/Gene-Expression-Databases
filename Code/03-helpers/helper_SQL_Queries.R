@@ -1,37 +1,36 @@
 # Helper: get proteins by name
-# Pushes name filtering to SQLite via SQL IN clause, then collects only matching
-# rows before performing complex summarisation in R. Avoids full table loads.
+# Pushes filtering and has-data membership checks to SQLite and only collects the
+# final, reduced result set.
 get_proteins_by_name <- function(name, conn) {
   tab_gene_names <- dplyr::tbl(conn, "tab_gene_names")
   tab_gene_variants <- dplyr::tbl(conn, "tab_gene_variants")
   tab_expression_data_values <- dplyr::tbl(conn, "tab_expression_data_values")
 
-  # Filter in SQL using IN clause (translates cleanly; avoids untranslatable regex)
-  # then collect only the matching rows before any R-side aggregation
+  # Summarise in SQL to keep intermediate data remote until final collect.
   proteinsbyname <- tab_gene_names |>
     dplyr::filter(gene_name %in% !!name) |>
-    dplyr::collect() |>
     dplyr::group_by(gene_id) |>
     dplyr::summarise(
       gene_name = min(gene_name),
       name_type = min(name_type),
-      symbol = dplyr::first(gene_name[name_type == "SYMBOL"], default = NA_character_),
-      gene_id_str = dplyr::first(gene_name[name_type == "GENE_ID"], default = NA_character_),
-      official_full_name = dplyr::first(
-        gene_name[name_type == "OFFICIAL_FULL_NAME"], default = NA_character_
-      )
+      symbol = max(dplyr::if_else(name_type == "SYMBOL", gene_name, NA_character_)),
+      gene_id_str = max(dplyr::if_else(name_type == "GENE_ID", gene_name, NA_character_)),
+      official_full_name = max(dplyr::if_else(
+        name_type == "OFFICIAL_FULL_NAME", gene_name, NA_character_
+      ))
     ) |>
     dplyr::ungroup()
 
-  # Use SQL semi_join to find genes that have expression data — avoids pulling
-  # all variant_ids into R memory
-  has_data_gene_ids <- tab_gene_variants |>
+  # Keep has-data membership evaluation in SQL via semi_join.
+  genes_with_data <- tab_gene_variants |>
     dplyr::semi_join(tab_expression_data_values, by = "variant_id") |>
     dplyr::distinct(gene_id) |>
-    dplyr::pull(gene_id)
+    dplyr::mutate(has_data = 1L)
 
   proteinsbyname |>
-    dplyr::mutate(has_data = as.integer(gene_id %in% has_data_gene_ids))
+    dplyr::left_join(genes_with_data, by = "gene_id") |>
+    dplyr::mutate(has_data = dplyr::coalesce(has_data, 0L)) |>
+    dplyr::collect()
 }
 
 # Helper: get expression data by gene id

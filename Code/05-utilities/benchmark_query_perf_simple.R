@@ -60,6 +60,7 @@ cat("=== Test 2: get_proteins_by_name() Function ===\n")
 gene_names_sample <- dplyr::tbl(conn, "tab_gene_names") |>
   dplyr::filter(name_type == "SYMBOL") |>
   dplyr::distinct(gene_name) |>
+  head(50) |>
   dplyr::collect() |>
   dplyr::pull(gene_name)
 
@@ -109,6 +110,8 @@ cat("\n=== Test 3: get_expression_data_by_gene_id() Function ===\n")
 
 # Get actual gene IDs
 gene_ids_sample <- dplyr::tbl(conn, "tab_genes") |>
+  dplyr::select(gene_id) |>
+  head(30) |>
   dplyr::collect() |>
   dplyr::pull(gene_id)
 

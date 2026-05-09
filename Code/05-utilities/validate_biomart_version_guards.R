@@ -28,11 +28,6 @@ check_entry <- function(e) {
   for (h in e$hosts) {
     host_label <- ifelse(is.na(h), "<default>", h)
     res <- tryCatch({
-      mart <- if (is.na(h)) {
-        biomaRt::useMart("ensembl", dataset = e$dataset)
-      } else {
-        biomaRt::useMart("ensembl", dataset = e$dataset, host = h)
-      }
       meta <- if (is.na(h)) {
         biomaRt::useMart("ensembl")
       } else {
