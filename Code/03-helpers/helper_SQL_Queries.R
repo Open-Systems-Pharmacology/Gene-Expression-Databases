@@ -1,52 +1,37 @@
 # Helper: get proteins by name
-# Uses lazy evaluation with dplyr::tbl() to push filtering to SQLite
-# Avoids loading entire tables into memory
+# Pushes name filtering to SQLite via SQL IN clause, then collects only matching
+# rows before performing complex summarisation in R. Avoids full table loads.
 get_proteins_by_name <- function(name, conn) {
-  # Use lazy evaluation for all table references
   tab_gene_names <- dplyr::tbl(conn, "tab_gene_names")
   tab_gene_variants <- dplyr::tbl(conn, "tab_gene_variants")
   tab_expression_data_values <- dplyr::tbl(conn, "tab_expression_data_values")
 
-  # Subquery: identify variant_ids that have expression data
-  variant_ids_with_data <- tab_expression_data_values |>
-    dplyr::distinct(variant_id) |>
-    dplyr::pull(variant_id) |>
-    unique()
-
+  # Filter in SQL using IN clause (translates cleanly; avoids untranslatable regex)
+  # then collect only the matching rows before any R-side aggregation
   proteinsbyname <- tab_gene_names |>
-    # Filter by gene name using SQL LIKE operator (more efficient than string detection in R)
-    dplyr::filter(stringr::str_detect(gene_name, paste(stringr::str_escape(name), collapse = "|"))) |>
+    dplyr::filter(gene_name %in% !!name) |>
+    dplyr::collect() |>
     dplyr::group_by(gene_id) |>
     dplyr::summarise(
       gene_name = min(gene_name),
       name_type = min(name_type),
-      symbol = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "SYMBOL"], default = NA_character_),
-        NA_character_
-      ),
-      gene_id_str = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "GENE_ID"], default = NA_character_),
-        NA_character_
-      ),
-      official_full_name = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "OFFICIAL_FULL_NAME"], default = NA_character_),
-        NA_character_
+      symbol = dplyr::first(gene_name[name_type == "SYMBOL"], default = NA_character_),
+      gene_id_str = dplyr::first(gene_name[name_type == "GENE_ID"], default = NA_character_),
+      official_full_name = dplyr::first(
+        gene_name[name_type == "OFFICIAL_FULL_NAME"], default = NA_character_
       )
     ) |>
     dplyr::ungroup()
 
-  # Use parameterized query to check which genes have expression data
-  has_data_ids <- tab_gene_variants |>
-    dplyr::filter(variant_id %in% !!variant_ids_with_data) |>
-    dplyr::pull(gene_id) |>
-    unique()
+  # Use SQL semi_join to find genes that have expression data — avoids pulling
+  # all variant_ids into R memory
+  has_data_gene_ids <- tab_gene_variants |>
+    dplyr::semi_join(tab_expression_data_values, by = "variant_id") |>
+    dplyr::distinct(gene_id) |>
+    dplyr::pull(gene_id)
 
-  # Collect only after all filtering is done
   proteinsbyname |>
-    dplyr::mutate(
-      has_data = as.integer(gene_id %in% !!has_data_ids)
-    ) |>
-    dplyr::collect()
+    dplyr::mutate(has_data = as.integer(gene_id %in% has_data_gene_ids))
 }
 
 # Helper: get expression data by gene id
@@ -137,7 +122,7 @@ get_hint <- function(conn, table_name, column, value) {
   info <- table |>
     dplyr::filter(.data[[column]] == !!value) |>
     dplyr::collect()
-  if (nrow(info) == 0) {
+  if (nrow(info) == 0 || !"INFORMATION" %in% colnames(info)) {
     return("")
   }
   info$INFORMATION[1]
@@ -156,8 +141,8 @@ get_database_rec_properties <- function(conn, database, rec_id) {
   dplyr::tbl(conn, "tab_database_rec_properties") |>
     dplyr::filter(data_base == !!database, data_base_rec_id == !!rec_id) |>
     dplyr::mutate(property_string = paste(PROPERTY, PROPERTY_VALUE, sep = ": ")) |>
-    dplyr::pull(property_string) |>
-    collect()
+    dplyr::collect() |>
+    dplyr::pull(property_string)
 }
 
 # Helper: get database record infos
