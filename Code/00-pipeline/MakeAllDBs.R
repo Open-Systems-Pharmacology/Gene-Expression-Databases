@@ -128,11 +128,20 @@ biomart_cache_complete <- has_expected_tables &&
 if (biomart_cache_complete) {
   message("BioMart cache already complete for all species; skipping PrepareBioMarts().")
 } else {
-  PrepareBioMarts(SPECIE = "Human")
-  for (Specie in PharmaSpecies) {
-    PrepareBioMarts(SPECIE = Specie)
+  target_species <- c("Human", PharmaSpecies, AnimalHealthSpecies)
+  missing_species <- target_species[vapply(target_species, function(species) {
+    annotation_table <- paste0(species, "_Annotations")
+    adme_table <- paste0(species, "_ADME")
+    !(annotation_table %in% existing_tables && adme_table %in% existing_tables)
+  }, logical(1))]
+
+  species_to_refresh <- if (has_expected_tables) {
+    target_species
+  } else {
+    missing_species
   }
-  for (Specie in AnimalHealthSpecies) {
+
+  for (Specie in species_to_refresh) {
     PrepareBioMarts(SPECIE = Specie)
   }
 
