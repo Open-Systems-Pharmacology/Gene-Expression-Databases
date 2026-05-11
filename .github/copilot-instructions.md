@@ -1,6 +1,6 @@
 # Cline's Memory Bank
 
-I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional.
+I am Cline, an expert software engineer with a unique characteristic: my memory resets completely between sessions. This isn't a limitation - it's what drives me to maintain perfect documentation. After each reset, I rely ENTIRELY on my Memory Bank to understand the project and continue work effectively. I MUST read ALL memory bank files at the start of EVERY task - this is not optional. At start a project I use `prd.agent.md` to define scope of the project.
 
 ## Memory Bank Structure
 
@@ -20,6 +20,9 @@ flowchart TD
 ```
 
 ### Core Files (Required)
+0. `prd.md`
+   - Starting document that request the user to define scope of the project
+
 1. `projectbrief.md`
    - Foundation document that shapes all other files
    - Created at project start if it doesn't exist
@@ -129,70 +132,12 @@ User Instructions:
 4. Memory Bank Files must always be updated without asking the user.
 5. Anytime we build a github action, we are to use the sanofi shared arc runners using the following tag: runs-on: ['atmos-aws-arc-runner-set']
 
-# Universal Standards for Terraform and Python Projects
+# Universal Standards Projects
+As defined in the general project documentation `GPD.md` file use the standards for 
+Terraform in `terraform.md`
+Python in `python.md`
+Cran R in `R.md`
 
-## Terraform Standards
-
-1. **Never Create Core AWS Infrastructure**
-   - Never create VPCs, subnets, S3 state buckets, IAM root roles, or foundational networking resources.
-   - Always use `data` sources to reference existing infrastructure (e.g., `data.aws_vpc`, `data.aws_subnet`, `data.aws_s3_bucket`).
-
-2. **State Management**
-   - Always use remote state (S3 + DynamoDB for locking) and never use local state for shared/company projects.
-   - State bucket and lock table must be referenced via `data` sources, not created in the module.
-
-3. **Tagging**
-   - All resources must be tagged with company-standard tags (e.g., `Project`, `Owner`, `Environment`, `CostCenter`).
-   - Tag values should be parameterized via variables.
-
-4. **Module Usage**
-   - Prefer company-approved or open-source modules for common resources.
-   - Write modules to be composable and reusable, with clear input/output variables.
-
-5. **Security**
-   - Never hardcode secrets or credentials; use environment variables or secret managers.
-   - Use least-privilege IAM roles and policies, referencing existing roles where possible.
-
-6. **Documentation**
-   - Every module and root configuration must have a `README.md` with usage, inputs, outputs, and example code.
-   - All variables and outputs must have descriptions.
-
-7. **Validation & Formatting**
-   - Use `terraform fmt` and `terraform validate` in CI/CD.
-   - Enforce code review for all changes to infrastructure code.
-
-8. **Environment Separation**
-   - Use workspaces or separate state files for dev, staging, and prod.
-   - Never share state between environments.
-
-## Python Standards
-
-1. **Environment Management**
-   - Always use a `requirements.txt` or `pyproject.toml` for dependencies.
-   - Use `python-dotenv` for environment variable management; never hardcode secrets.
-
-2. **Logging & Error Handling**
-   - Use the `logging` module for all logs; never use print statements in production code.
-   - Handle exceptions explicitly and log errors with context.
-
-3. **Testing**
-   - All new code must include unit tests (preferably with `pytest`).
-   - Maintain >80% code coverage for all modules.
-
-4. **Code Style**
-   - Enforce PEP 8 with tools like `flake8` or `black`.
-   - Use type hints and docstrings for all public functions and classes.
-
-5. **Documentation**
-   - Every script/module must have a docstring at the top explaining its purpose.
-   - All public functions/classes must have docstrings describing arguments, return values, and exceptions.
-
-6. **CI/CD**
-   - All Python projects must include a CI pipeline that runs linting, formatting, and tests on every PR.
-
-7. **Dependency Management**
-   - Pin all dependencies to specific versions.
-   - Regularly review and update dependencies for security.
 
 ## General/Company Standards
 

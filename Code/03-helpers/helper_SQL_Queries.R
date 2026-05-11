@@ -1,40 +1,36 @@
 # Helper: get proteins by name
+# Pushes filtering and has-data membership checks to SQLite and only collects the
+# final, reduced result set.
 get_proteins_by_name <- function(name, conn) {
-  tab_gene_names <- RSQLite::dbReadTable(conn, "tab_gene_names")
-  tab_gene_variants <- RSQLite::dbReadTable(conn, "tab_gene_variants")
-  tab_expression_data_values <- RSQLite::dbReadTable(conn, "tab_expression_data_values")
+  tab_gene_names <- dplyr::tbl(conn, "tab_gene_names")
+  tab_gene_variants <- dplyr::tbl(conn, "tab_gene_variants")
+  tab_expression_data_values <- dplyr::tbl(conn, "tab_expression_data_values")
 
+  # Summarise in SQL to keep intermediate data remote until final collect.
   proteinsbyname <- tab_gene_names |>
-    # dplyr::filter(grepl(name, gene_name)) |>
-    dplyr::filter(stringr::str_detect(gene_name, paste(stringr::str_escape(name), collapse = "|"))) |>
+    dplyr::filter(gene_name %in% !!name) |>
     dplyr::group_by(gene_id) |>
     dplyr::summarise(
       gene_name = min(gene_name),
       name_type = min(name_type),
-      symbol = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "SYMBOL"], default = NA_character_),
-        NA_character_
-      ),
-      gene_id_str = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "GENE_ID"], default = NA_character_),
-        NA_character_
-      ),
-      official_full_name = dplyr::coalesce(
-        dplyr::first(gene_name[name_type == "OFFICIAL_FULL_NAME"], default = NA_character_),
-        NA_character_
-      )
+      symbol = max(dplyr::if_else(name_type == "SYMBOL", gene_name, NA_character_)),
+      gene_id_str = max(dplyr::if_else(name_type == "GENE_ID", gene_name, NA_character_)),
+      official_full_name = max(dplyr::if_else(
+        name_type == "OFFICIAL_FULL_NAME", gene_name, NA_character_
+      ))
     ) |>
     dplyr::ungroup()
 
-  has_data_ids <- tab_gene_variants |>
-    dplyr::filter(variant_id %in% tab_expression_data_values$variant_id) |>
-    dplyr::pull(gene_id) |>
-    unique()
+  # Keep has-data membership evaluation in SQL via semi_join.
+  genes_with_data <- tab_gene_variants |>
+    dplyr::semi_join(tab_expression_data_values, by = "variant_id") |>
+    dplyr::distinct(gene_id) |>
+    dplyr::mutate(has_data = 1L)
 
   proteinsbyname |>
-    dplyr::mutate(
-      has_data = as.integer(gene_id %in% has_data_ids)
-    )
+    dplyr::left_join(genes_with_data, by = "gene_id") |>
+    dplyr::mutate(has_data = dplyr::coalesce(has_data, 0L)) |>
+    dplyr::collect()
 }
 
 # Helper: get expression data by gene id
@@ -111,53 +107,63 @@ get_expression_data_by_gene_id <- function(
 }
 
 # Helper: get container tissue mapping
+# Uses lazy evaluation to avoid loading full table into memory
 get_container_tissue_mapping <- function(conn) {
-  tab_container_tissue <- RSQLite::dbReadTable(conn, "tab_container_tissue")
-  tab_container_tissue |> dplyr::select(container, tissue)
+  dplyr::tbl(conn, "tab_container_tissue") |>
+    dplyr::select(container, tissue) |>
+    dplyr::collect()
 }
 
 # Helper: get hint information
+# Uses lazy evaluation and SQL WHERE clause to fetch only required rows
 get_hint <- function(conn, table_name, column, value) {
-  table <- RSQLite::dbReadTable(conn, table_name)
-  info <- table |> dplyr::filter(.data[[column]] == value)
-  if (nrow(info) == 0) {
+  table <- dplyr::tbl(conn, table_name)
+  info <- table |>
+    dplyr::filter(.data[[column]] == !!value) |>
+    dplyr::collect()
+  if (nrow(info) == 0 || !"INFORMATION" %in% colnames(info)) {
     return("")
   }
   info$INFORMATION[1]
 }
 # Example usage:
-# gender_hint <- get_hint(tab_gender_hint, "gender", "male")
-# tissue_hint <- get_hint(tab_tissue_hint, "tissue", "liver")
-# health_state_hint <- get_hint(tab_health_state_hint, "health_state", "healthy")
-# sample_source_hint <- get_hint(tab_sample_source_hint, "sample_source", "blood")
-# unit_hint <- get_hint(tab_unit_hint, "unit", "TPM")
-# name_type_hint <- get_hint(tab_name_type_hint, "name_type", "symbol")
+# gender_hint <- get_hint(conn, "tab_gender_hint", "gender", "male")
+# tissue_hint <- get_hint(conn, "tab_tissue_hint", "tissue", "liver")
+# health_state_hint <- get_hint(conn, "tab_health_state_hint", "health_state", "healthy")
+# sample_source_hint <- get_hint(conn, "tab_sample_source_hint", "sample_source", "blood")
+# unit_hint <- get_hint(conn, "tab_unit_hint", "unit", "TPM")
+# name_type_hint <- get_hint(conn, "tab_name_type_hint", "name_type", "symbol")
 
 # Helper: get database record properties
+# Uses lazy evaluation and SQL WHERE clauses for efficient filtering
 get_database_rec_properties <- function(conn, database, rec_id) {
-  tab_database_rec_properties <- RSQLite::dbReadTable(conn, "tab_database_rec_properties")
-  tab_database_rec_properties |>
-    dplyr::filter(data_base == database, data_base_rec_id == rec_id) |>
+  dplyr::tbl(conn, "tab_database_rec_properties") |>
+    dplyr::filter(data_base == !!database, data_base_rec_id == !!rec_id) |>
     dplyr::mutate(property_string = paste(PROPERTY, PROPERTY_VALUE, sep = ": ")) |>
+    dplyr::collect() |>
     dplyr::pull(property_string)
 }
 
 # Helper: get database record infos
+# Uses lazy evaluation and SQL WHERE clauses for efficient filtering
 get_database_rec_infos <- function(conn, database, rec_id) {
-  tab_database_rec_info <- RSQLite::dbReadTable(conn, "tab_database_rec_info")
-  tab_database_rec_info |>
-    dplyr::filter(data_base == database, data_base_rec_id == rec_id) |>
+  dplyr::tbl(conn, "tab_database_rec_info") |>
+    dplyr::filter(data_base == !!database, data_base_rec_id == !!rec_id) |>
     dplyr::select(-data_base, -data_base_rec_id) |>
+    dplyr::collect() |>
     tidyr::pivot_longer(everything(), names_to = "column", values_to = "value") |>
     dplyr::mutate(info_string = paste(column, value, sep = ": ")) |>
     dplyr::pull(info_string)
 }
 
 # Helper: validate query columns
+# Uses DBI::dbListFields() to check columns without loading table data
 validate_query <- function(conn, table_name, columns) {
-  table <- RSQLite::dbReadTable(conn, table_name)
-  missing <- setdiff(columns, colnames(table))
-  if (length(missing) > 0) stop(paste("Missing columns:", paste(missing, collapse = ", ")))
+  existing_columns <- DBI::dbListFields(conn, table_name)
+  missing <- setdiff(columns, existing_columns)
+  if (length(missing) > 0) {
+    stop(paste("Missing columns in", table_name, ":", paste(missing, collapse = ", ")))
+  }
 }
 
 # Helper: clear cache (if using environments or lists for caching)
