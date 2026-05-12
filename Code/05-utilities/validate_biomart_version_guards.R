@@ -2,26 +2,22 @@
 
 suppressPackageStartupMessages(library(biomaRt))
 
-entries <- list(
-  list(species = "Cat", dataset = "fcatus_gene_ensembl", hosts = c("https://may2021.archive.ensembl.org", "https://www.ensembl.org"), expected = "^Felis_catus_9\\.0$"),
-  list(species = "Cattle", dataset = "btaurus_gene_ensembl", hosts = c("https://may2021.archive.ensembl.org", "https://www.ensembl.org"), expected = "^ARS-UCD1\\.2$"),
-  list(species = "Chicken", dataset = "ggallus_gene_ensembl", hosts = c("https://apr2022.archive.ensembl.org", "https://may2021.archive.ensembl.org"), expected = "^GRCg6a$"),
-  list(species = "Dog", dataset = "clfamiliaris_gene_ensembl", hosts = c("https://may2021.archive.ensembl.org", "https://www.ensembl.org"), expected = "^CanFam3\\.1$"),
-  list(species = "Goat", dataset = "chircus_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^ARS1$"),
-  list(species = "Guineapig", dataset = "cporcellus_gene_ensembl", hosts = c("https://may2025.archive.ensembl.org", "https://www.ensembl.org"), expected = "^Cavpor3\\.0$"),
-  list(species = "Horse", dataset = "ecaballus_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^EquCab3\\.0$"),
-  list(species = "Human", dataset = "hsapiens_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^GRCh38\\.p14$"),
-  list(species = "Minipig", dataset = "sscrofa_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^Sscrofa11\\.1$"),
-  list(species = "Monkey_fascicularis", dataset = "mfascicularis_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^Macaca_fascicularis_6\\.0$"),
-  list(species = "Monkey_mulatta", dataset = "mmulatta_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^Mmul_10$"),
-  list(species = "Monkey_PigTailed", dataset = "mnemestrina_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^Mnem_1\\.0$"),
-  list(species = "Mouse", dataset = "mmusculus_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^GRCm39$"),
-  list(species = "Rabbit", dataset = "ocuniculus_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^OryCun2\\.0$"),
-  list(species = "Rat", dataset = "rnorvegicus_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^GRCr8$"),
-  list(species = "Sheep", dataset = "oaries_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^ARS-UI_Ramb_v3\\.0$"),
-  list(species = "Turkey", dataset = "mgallopavo_gene_ensembl", hosts = c(NA_character_, "https://www.ensembl.org", "https://useast.ensembl.org", "https://uswest.ensembl.org", "https://asia.ensembl.org"), expected = "^Turkey_5\\.1$"),
-  list(species = "Zebrafish", dataset = "drerio_gene_ensembl", hosts = c("https://oct2024.archive.ensembl.org", "https://www.ensembl.org"), expected = "^GRCz11$")
-)
+script_file_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+if (length(script_file_arg) == 1) {
+  script_path <- normalizePath(sub("^--file=", "", script_file_arg), winslash = "/")
+} else {
+  script_path <- normalizePath("Code/05-utilities/validate_biomart_version_guards.R", winslash = "/")
+}
+
+repo_root <- normalizePath(file.path(dirname(script_path), "..", ".."), winslash = "/")
+source(file.path(repo_root, "Code/03-helpers/helper_BioMart_Pins.R"))
+source(file.path(repo_root, "Code/03-helpers/helper_Species.R"))
+
+entries <- get_biomart_entries()
+entry_species <- sort(vapply(entries, function(e) e$species, character(1)))
+if (!identical(unname(entry_species), sort(ALL_SPECIE))) {
+  stop("Shared BioMart pin definitions are out of sync with helper_Species.R")
+}
 
 check_entry <- function(e) {
   attempts <- c()

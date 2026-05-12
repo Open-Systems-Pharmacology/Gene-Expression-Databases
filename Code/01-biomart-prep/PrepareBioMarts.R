@@ -58,6 +58,7 @@ PrepareBioMarts <- function(SPECIE) {
   # adding the various identifier and information is extremely memory
   # intensive and might only work with a 64-bit R version!
   source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
+  source(paste0(PATH, "/Code/03-helpers/helper_BioMart_Pins.R"))
   # ALL_SPECIE <- c(
   #    "Mouse", "Rat", "Rabbit", "Guineapig", "Dog", "Minipig",
   #    "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed",
@@ -175,229 +176,20 @@ PrepareBioMarts <- function(SPECIE) {
     ))
   }
 
-  # List of available species:
-  # ensembl <- biomaRt::useMart("ensembl")
-  # ListOfEnsemblSpecies <- biomaRt::listDatasets(ensembl)
-  # ListOfEnsemblArchives <- biomaRt::listEnsemblArchives()
-  #
-  switch(SPECIE,
-    Cat = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "fcatus_gene_ensembl",
-        hosts = c(
-          "https://may2021.archive.ensembl.org",
-          "https://www.ensembl.org"
-        ),
-        expected_version_pattern = "^Felis_catus_9\\.0$"
-      )
-    },
-    Cattle = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "btaurus_gene_ensembl",
-        hosts = c(
-          "https://may2021.archive.ensembl.org",
-          "https://www.ensembl.org"
-        ),
-        expected_version_pattern = "^ARS-UCD1\\.2$"
-      )
-    },
-    Chicken = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "ggallus_gene_ensembl",
-        hosts = c(
-          "https://apr2022.archive.ensembl.org",
-          "https://may2021.archive.ensembl.org"
-        ),
-        expected_version_pattern = "^GRCg6a$"
-      )
-    },
-    Dog = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "clfamiliaris_gene_ensembl",
-        hosts = c(
-          "https://may2021.archive.ensembl.org",
-          "https://www.ensembl.org"
-        ),
-        expected_version_pattern = "^CanFam3\\.1$"
-      )
-    },
-    Goat = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "chircus_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^ARS1$"
-      )
-    },
-    Guineapig = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "cporcellus_gene_ensembl",
-        hosts = c(
-          "https://may2025.archive.ensembl.org",
-          "https://www.ensembl.org"
-        ),
-        expected_version_pattern = "^Cavpor3\\.0$"
-      )
-    },
-    Horse = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "ecaballus_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^EquCab3\\.0$"
-      )
-    },
-    Human = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "hsapiens_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^GRCh38\\.p14$"
-      )
-    },
-    Minipig = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "sscrofa_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^Sscrofa11\\.1$"
-      )
-    },
-    Monkey_fascicularis = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "mfascicularis_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^Macaca_fascicularis_6\\.0$"
-      )
-    },
-    Monkey_mulatta = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "mmulatta_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^Mmul_10$"
-      )
-    },
-    Monkey_PigTailed = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "mnemestrina_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^Mnem_1\\.0$"
-      )
-    },
-    Mouse = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "mmusculus_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^GRCm39$"
-      )
-    },
-    Rabbit = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "ocuniculus_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^OryCun2\\.0$"
-      )
-    },
-    Rat = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "rnorvegicus_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^GRCr8$"
-      )
-    },
-    Sheep = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "oaries_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^ARS-UI_Ramb_v3\\.0$"
-      )
-    },
-    Turkey = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "mgallopavo_gene_ensembl",
-        hosts = c(
-          NA_character_,
-          "https://www.ensembl.org",
-          "https://useast.ensembl.org",
-          "https://uswest.ensembl.org",
-          "https://asia.ensembl.org"
-        ),
-        expected_version_pattern = "^Turkey_5\\.1$"
-      )
-    },
-    Zebrafish = {
-      ensembl <- connect_ensembl_mart(
-        dataset = "drerio_gene_ensembl",
-        hosts = c(
-          "https://oct2024.archive.ensembl.org",
-          "https://www.ensembl.org"
-        ),
-        expected_version_pattern = "^GRCz11$"
-      )
-    },  
+  biomart_pins <- get_biomart_entries()
+  if (!identical(sort(unname(names(biomart_pins))), sort(ALL_SPECIE))) {
+    stop("BioMart pin definitions and ALL_SPECIE are out of sync.")
+  }
+
+  species_pin <- biomart_pins[[SPECIE]]
+  if (is.null(species_pin)) {
     stop(paste0("No biomaRt dataset configured for SPECIE='", SPECIE, "'"))
+  }
+
+  ensembl <- connect_ensembl_mart(
+    dataset = species_pin$dataset,
+    hosts = species_pin$hosts,
+    expected_version_pattern = species_pin$expected
   )
 
   #### Select annotation information and identifiers; mapping ortholog genes  ####

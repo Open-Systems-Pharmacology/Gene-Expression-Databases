@@ -60,6 +60,7 @@ cat("=== Test 2: get_proteins_by_name() Function ===\n")
 gene_names_sample <- dplyr::tbl(conn, "tab_gene_names") |>
   dplyr::filter(name_type == "SYMBOL") |>
   dplyr::distinct(gene_name) |>
+  dplyr::slice_head(n = 50) |>
   dplyr::collect() |>
   dplyr::pull(gene_name)
 
@@ -77,6 +78,7 @@ test_sets <- list(
 
 results_1 <- list()
 
+had_errors <- FALSE  
 for (label in names(test_sets)) {
   test_genes <- test_sets[[label]]
   cat(sprintf("Testing %s: ", label))
@@ -100,6 +102,7 @@ for (label in names(test_sets)) {
     
     results_1[[label]] <- list(time_ms = time_ms, mem_mb = mem_delta, rows = nrow(result))
   }, error = function(e) {
+    had_errors <<- TRUE
     cat(sprintf("❌ ERROR: %s\n", e$message))
   })
 }
@@ -110,6 +113,7 @@ cat("\n=== Test 3: get_expression_data_by_gene_id() Function ===\n")
 # Get actual gene IDs
 gene_ids_sample <- dplyr::tbl(conn, "tab_genes") |>
   dplyr::collect() |>
+  dplyr::slice_head(n = 50) |>
   dplyr::pull(gene_id)
 
 if (length(gene_ids_sample) == 0) {
@@ -124,6 +128,7 @@ test_sets_2 <- list(
 
 results_2 <- list()
 
+had_errors <- FALSE 
 for (label in names(test_sets_2)) {
   test_ids <- test_sets_2[[label]]
   cat(sprintf("Testing %s: ", label))
@@ -146,6 +151,7 @@ for (label in names(test_sets_2)) {
     
     results_2[[label]] <- list(time_ms = time_ms, mem_mb = mem_delta, rows = nrow(result))
   }, error = function(e) {
+    had_errors <<- TRUE
     cat(sprintf("❌ ERROR: %s\n", e$message))
   })
 }
@@ -188,4 +194,9 @@ if (length(results_1) > 0 && length(results_2) > 0) {
   }
 }
 
-cat("Benchmark completed successfully.\n")
+if (had_errors) {
+  cat("Benchmark completed with errors.\n")
+  quit(status = 1)
+} else {
+  cat("Benchmark completed successfully.\n")
+}

@@ -135,15 +135,19 @@ These guardrails are intended to keep generated databases reproducible and mappi
 
 Include the following in the PR description:
 
-1. **Pinned inputs**
+1. **PR scope category (required)**
+   - Include one or more of: `core-sql-memory`, `biomart-mapping`, `qualification`, `docs`.
+   - This field is mandatory in PR descriptions for relevant changes.
+
+2. **Pinned inputs**
    - Bgee release, Ensembl/BioMart host(s), expected version/assembly assumptions.
 
-2. **Validation run summary**
+3. **Validation run summary**
    - Species coverage checked.
    - Version-guard/fallback checks passed.
    - Representative functional species checks listed.
 
-3. **Behavior statement**
+4. **Behavior statement**
    - State whether behavior is unchanged or intentionally changed.
    - If changed, explain downstream qualification impact.
 
@@ -157,6 +161,7 @@ Include the following in the PR description:
 
 ### Suggested PR Checklist
 
+- [ ] PR scope category is provided (`core-sql-memory`, `biomart-mapping`, `qualification`, `docs`, or combinations).
 - [ ] Bgee release assumptions are explicit.
 - [ ] BioMart host/version pinning is explicit.
 - [ ] Fallback logic has assembly/version guards.

@@ -17,6 +17,7 @@ Lazy: ✅ YES
 Result: ✅ PASS
 ```
 
+
 ### Test 2: get_proteins_by_name()
 
 | Query Size | Time (ms) | Memory (MB) | Genes Found | Status |
