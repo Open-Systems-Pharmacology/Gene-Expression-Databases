@@ -407,6 +407,11 @@ compute_validation_stats <- function(old_data, new_data, gene_name) {
     cor_val <- NA_real_
   }
 
+  # Threshold 0.7 for container-level paired means correlation:
+  # Container aggregation (via old_by_container/new_by_container) computes means per tissue.
+  # This container-level approach reduces noise from individual measurements and is more
+  # appropriate for gene family validation. The 0.7 threshold reflects high concordance
+  # between old and new databases at the container (tissue-level) granularity.
   status <- if (!is.na(cor_val) && cor_val > 0.7) "PASS" else if (is.na(cor_val)) "MISSING" else "WARN"
 
   tibble::tibble(
@@ -487,17 +492,21 @@ summary_file <- file.path(data_dir, "validation_summary.csv")
 readr::write_csv(summary_stats, summary_file)
 message("Exported validation summary: ", summary_file)
 
-# Print summary
-message("\n=== VALIDATION SUMMARY ===")
-print(summary_stats |>
-  dplyr::select(gene_name, family, validation_status, correlation_old_new))
-
-# Explicit cleanup is more reliable than top-level on.exit() when this script is sourced
-if (!is.null(genedb_old) && DBI::dbIsValid(genedb_old)) {
-  DBI::dbDisconnect(genedb_old)
-}
-if (!is.null(genedb_new) && DBI::dbIsValid(genedb_new)) {
-  DBI::dbDisconnect(genedb_new)
-}
-
-message("\nQualification complete!")
+# Print summary and ensure guaranteed cleanup via tryCatch/finally
+tryCatch(
+  {
+    message("\n=== VALIDATION SUMMARY ===")
+    print(summary_stats |
+      dplyr::select(gene_name, family, validation_status, correlation_old_new))
+  },
+  finally = {
+    # Guaranteed cleanup: always runs regardless of errors
+    if (!is.null(genedb_old) && DBI::dbIsValid(genedb_old)) {
+      DBI::dbDisconnect(genedb_old)
+    }
+    if (!is.null(genedb_new) && DBI::dbIsValid(genedb_new)) {
+      DBI::dbDisconnect(genedb_new)
+    }
+    message("\nQualification complete!")
+  }
+)

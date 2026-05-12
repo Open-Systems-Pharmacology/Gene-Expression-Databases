@@ -207,8 +207,8 @@ if (!is.null(GSE30611_ERX011211_OSP_DB)) {
         plot.subtitle = ggplot2::element_text(size = 10, color = "gray40", hjust = 0.5),
         axis.title = ggplot2::element_text(face = "bold", size = 10),
         axis.text = ggplot2::element_text(size = 9),
-        panel.grid.major = ggplot2::element_line(color = "gray90", size = 0.2),
-        panel.grid.minor = ggplot2::element_line(color = "gray95", size = 0.1),
+        panel.grid.major = ggplot2::element_line(color = "gray90", linewidth = 0.2),
+        panel.grid.minor = ggplot2::element_line(color = "gray95", linewidth = 0.1),
         plot.margin = ggplot2::margin(t = 10, r = 10, b = 10, l = 10)
       )
 
