@@ -6,42 +6,29 @@ This folder contains the comprehensive qualification framework for OSP Expressio
 
 ```
 Code/04-qualification/
-├── 01_config/                    # Shared configuration (version-controlled)
+├── config/                       # Shared configuration (version-controlled)
 │   ├── proteins-validation.txt        # 57 genes for validation (one per line)
 │   ├── container-mapping.txt          # Tissue-to-container mappings (tab-separated)
 │   └── cross-species-genes.txt        # 40 ADME genes for cross-species validation
 │
-├── level1/                       # LEVEL 1: Technical Validation
-│   ├── 02_data/                  # Intermediate data & caches (generated)
-│   │   ├── DATA_HUMAN_GSE30611_ERX011211_BgeeDB.csv      (Bgee API cache)
-│   │   └── technical_validation_data.csv                 (Bgee → OSP DB comparison)
-│   └── 03_plots/                 # Publication-ready plots (generated)
-│       └── technical_validation_xy_*.png                 (7 scatter plots by ADME family)
+├── scripts/                      # Executable R qualification scripts
+│   ├── Qualification_BgeeDB_2_PKSimDB.R   # Level 1 script
+│   ├── Qualification_PKSimDB.R            # Level 2 script
+│   └── Qualification_CrossSpecies.R       # Level 3 script
 │
-├── level2/                       # LEVEL 2: Biological Validation (Human)
-│   ├── 02_data/                  # Intermediate data & caches (generated)
-│   │   ├── DATA_HUMAN_GSE30611_ERX011211_OSP_DB.csv      (OSP DB extract cache)
-│   │   └── validation_summary.csv                        (37 genes × 12 metrics)
-│   └── 03_plots/                 # Publication-ready plots (generated)
-│       └── human_old_vs_new_*.png                        (4 composite violin plots by family)
-│
-├── level3/                       # LEVEL 3: Cross-Species Validation
-│   ├── 02_data/                  # Intermediate data (generated)
-│   │   └── cross_species_data_*.csv                      (Per-gene cross-species data)
-│   └── 03_plots/                 # Cross-species plots (generated)
-│       └── gene_*.png                                    (40 individual gene plots across species)
+├── results/                      # Generated data and plots
+│   ├── level1/
+│   │   ├── 02_data/              # Intermediate data & caches (generated)
+│   │   └── 03_plots/             # Technical validation plots
+│   ├── level2/
+│   │   ├── 02_data/              # Intermediate data & validation summaries
+│   │   └── 03_plots/             # Old-vs-new comparison plots
+│   └── level3/
+│       ├── 02_data/              # Cross-species intermediate data
+│       └── 03_plots/             # Cross-species gene plots
 │
 ├── DESCRIPTION                   # R package requirements specification
-├── renv.lock                     # R environment lock file (all package versions)
-│
-├── Qualification_BgeeDB_2_PKSimDB.R    # Wrapper: runs Level 1 validation
-├── Qualification_PKSimDB.R             # Wrapper: runs Level 2 validation
-├── Qualification_CrossSpecies.R        # Wrapper: runs Level 3 validation
-│
-└── level{1,2,3}-{name}/          # Actual validation scripts (sourced by wrappers)
-    ├── Qualification_BgeeDB_2_PKSimDB.R       (Level 1)
-    ├── Qualification_PKSimDB.R                (Level 2)
-    └── Qualification_CrossSpecies.R          (Level 3)
+└── renv.lock                     # R environment lock file (all package versions)
 ```
 
 ## Validation Levels
@@ -57,9 +44,7 @@ Code/04-qualification/
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R")
-# or directly:
-source("Code/04-qualification/level1-technical-validation/Qualification_BgeeDB_2_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R")
 ```
 
 ---
@@ -75,9 +60,7 @@ source("Code/04-qualification/level1-technical-validation/Qualification_BgeeDB_2
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_PKSimDB.R")
-# or directly:
-source("Code/04-qualification/level2-human-old-vs-new/Qualification_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_PKSimDB.R")
 ```
 
 ---
@@ -93,9 +76,7 @@ source("Code/04-qualification/level2-human-old-vs-new/Qualification_PKSimDB.R")
 
 **Run Command**:
 ```r
-source("Code/04-qualification/Qualification_CrossSpecies.R")
-# or directly:
-source("Code/04-qualification/level3-cross-species/Qualification_CrossSpecies.R")
+source("Code/04-qualification/scripts/Qualification_CrossSpecies.R")
 ```
 
 ---
@@ -149,13 +130,13 @@ renv::restore("Code/04-qualification/renv.lock")
 cd /path/to/Gene-Expression-Databases
 
 # Level 1: Technical validation (Bgee → OSP integration)
-Rscript Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R
+Rscript Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R
 
 # Level 2: Biological validation (Old vs New DB)
-Rscript Code/04-qualification/Qualification_PKSimDB.R
+Rscript Code/04-qualification/scripts/Qualification_PKSimDB.R
 
 # Level 3: Cross-species validation
-Rscript Code/04-qualification/Qualification_CrossSpecies.R
+Rscript Code/04-qualification/scripts/Qualification_CrossSpecies.R
 ```
 
 ### Run from Within R
@@ -163,13 +144,13 @@ Rscript Code/04-qualification/Qualification_CrossSpecies.R
 setwd("/path/to/Gene-Expression-Databases")
 
 # Level 1
-source("Code/04-qualification/Qualification_BgeeDB_2_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_BgeeDB_2_PKSimDB.R")
 
 # Level 2
-source("Code/04-qualification/Qualification_PKSimDB.R")
+source("Code/04-qualification/scripts/Qualification_PKSimDB.R")
 
 # Level 3
-source("Code/04-qualification/Qualification_CrossSpecies.R")
+source("Code/04-qualification/scripts/Qualification_CrossSpecies.R")
 ```
 
 ---
