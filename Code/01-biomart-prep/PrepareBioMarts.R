@@ -58,6 +58,7 @@ PrepareBioMarts <- function(SPECIE) {
   # adding the various identifier and information is extremely memory
   # intensive and might only work with a 64-bit R version!
   source(paste0(PATH, "/Code/03-helpers/helper_Species.R"))
+  source(paste0(PATH, "/Code/03-helpers/helper_BioMart_Pins.R"))
   # ALL_SPECIE <- c(
   #    "Mouse", "Rat", "Rabbit", "Guineapig", "Dog", "Minipig",
   #    "Monkey_mulatta", "Monkey_fascicularis", "Monkey_PigTailed",
@@ -95,84 +96,100 @@ PrepareBioMarts <- function(SPECIE) {
 
   #### Load biomaRt data and store ####
   print(paste0("Loading ", SPECIE, " gene inforamtion from biomart mirror."))
-  # List of available species:
-  # ensembl <- biomaRt::useMart("ensembl")
-  # ListOfEnsemblSpecies <- biomaRt::listDatasets(ensembl)
-  # ListOfEnsemblArchives <- biomaRt::listEnsemblArchives()
-  #
-  switch(SPECIE,
-    Cat = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "fcatus_gene_ensembl",
-        host = "https://may2021.archive.ensembl.org"
-      )
-    },
-    Cattle = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "btaurus_gene_ensembl",
-        host = "https://may2021.archive.ensembl.org"
-      )
-    },
-    Chicken = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "ggallus_gene_ensembl",
-        host = "https://apr2022.archive.ensembl.org"
-      )
-    },
-    Dog = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "clfamiliaris_gene_ensembl",
-        host = "https://may2021.archive.ensembl.org"
-      )
-    },
-    Goat = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "chircus_gene_ensembl"
-      )
-    },
-    Guineapig = {
-      ensembl <- biomaRt::useMart("ensembl",
-        dataset = "cporcellus_gene_ensembl",
-        host = "https://may2025.archive.ensembl.org"
-      )
-    },
-    Horse = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "ecaballus_gene_ensembl")
-    },
-    Human = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-    },
-    Minipig = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "sscrofa_gene_ensembl")
-    },
-    Monkey_fascicularis = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mfascicularis_gene_ensembl")
-    },
-    Monkey_mulatta = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mmulatta_gene_ensembl")
-    },
-    Monkey_PigTailed = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mnemestrina_gene_ensembl")
-    },
-    Mouse = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mmusculus_gene_ensembl")
-    },
-    Rabbit = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "ocuniculus_gene_ensembl")
-    },
-    Rat = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "rnorvegicus_gene_ensembl")
-    },
-    Sheep = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "oaries_gene_ensembl")
-    },
-    Turkey = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "mgallopavo_gene_ensembl")
-    },
-    Zebrafish = {
-      ensembl <- biomaRt::useMart("ensembl", dataset = "drerio_gene_ensembl", host = "https://oct2024.archive.ensembl.org")
-    },  
+  # Keep pinned dataset versions for reproducibility, but add retry/fallback
+  # handling for transient archive outages (HTTP 5xx / timeout).
+  connect_ensembl_mart <- function(
+      dataset,
+      hosts = NULL,
+      expected_version_pattern = NULL,
+      retries_per_host = 2
+  ) {
+    candidate_hosts <- if (is.null(hosts)) NA_character_ else hosts
+    last_error <- "Unknown error"
+
+    for (host in candidate_hosts) {
+      for (attempt in seq_len(retries_per_host)) {
+        connection <- tryCatch({
+          if (is.na(host)) {
+            biomaRt::useMart("ensembl", dataset = dataset)
+          } else {
+            biomaRt::useMart("ensembl", dataset = dataset, host = host)
+          }
+        }, error = function(e) {
+          last_error <<- conditionMessage(e)
+          NULL
+        })
+
+        if (!is.null(connection)) {
+          if (!is.null(expected_version_pattern)) {
+            ds_info <- tryCatch({
+              meta_mart <- if (is.na(host)) {
+                biomaRt::useMart("ensembl")
+              } else {
+                biomaRt::useMart("ensembl", host = host)
+              }
+              biomaRt::listDatasets(meta_mart)
+            }, error = function(e) {
+              last_error <<- conditionMessage(e)
+              NULL
+            })
+
+            if (is.null(ds_info)) {
+              Sys.sleep(2 * attempt)
+              next
+            }
+
+            ds_row <- ds_info[ds_info$dataset == dataset, , drop = FALSE]
+            if (nrow(ds_row) == 0) {
+              last_error <- paste0(
+                "Dataset '", dataset, "' not listed on host ",
+                ifelse(is.na(host), "<default>", host)
+              )
+              Sys.sleep(2 * attempt)
+              next
+            }
+
+            if (!grepl(expected_version_pattern, ds_row$version[1], ignore.case = TRUE)) {
+              last_error <- paste0(
+                "Dataset '", dataset, "' version '", ds_row$version[1],
+                "' does not match expected pattern '", expected_version_pattern, "'"
+              )
+              Sys.sleep(2 * attempt)
+              next
+            }
+          }
+
+          print(paste0(
+            "Connected to BioMart dataset '", dataset,
+            "' via host ", ifelse(is.na(host), "<default>", host)
+          ))
+          return(connection)
+        }
+
+        Sys.sleep(2 * attempt)
+      }
+    }
+
+    stop(paste0(
+      "Unable to connect to BioMart dataset '", dataset,
+      "'. Last error: ", last_error
+    ))
+  }
+
+  biomart_pins <- get_biomart_entries()
+  if (!identical(sort(unname(names(biomart_pins))), sort(ALL_SPECIE))) {
+    stop("BioMart pin definitions and ALL_SPECIE are out of sync.")
+  }
+
+  species_pin <- biomart_pins[[SPECIE]]
+  if (is.null(species_pin)) {
     stop(paste0("No biomaRt dataset configured for SPECIE='", SPECIE, "'"))
+  }
+
+  ensembl <- connect_ensembl_mart(
+    dataset = species_pin$dataset,
+    hosts = species_pin$hosts,
+    expected_version_pattern = species_pin$expected
   )
 
   #### Select annotation information and identifiers; mapping ortholog genes  ####

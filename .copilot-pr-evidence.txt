@@ -1,0 +1,24 @@
+PR scope category: biomart-mapping, core-sql-memory
+
+Pinned inputs:
+- Bgee release: 15_2
+- BioMart pins: centralized in Code/03-helpers/helper_BioMart_Pins.R (see get_biomart_entries())
+- Ensembl/BioMart hosts and expected version/assembly: explicit in pin helper
+
+Validation run summary:
+- Species coverage checked (ALL_SPECIE vs. pin helper)
+- Version-guard/fallback checks validated (see validate_biomart_version_guards.R)
+- Functional checks: MakeAllDBs.R parse/run, PrepareBioMarts.R parse/run, integration/benchmark scripts
+
+Behavior statement:
+- Behavior is unchanged for valid pins; cache skip logic is now robust to config drift. Only skips if both tables and config hash match. No breaking changes to downstream DBs or interfaces.
+- Downstream qualification: No impact except improved reproducibility and safety for BioMart mapping.
+
+Checklist:
+- [x] PR scope category is provided
+- [x] Bgee release assumptions are explicit
+- [x] BioMart host/version pinning is explicit
+- [x] Fallback logic has assembly/version guards
+- [x] All affected species dataset mappings verified
+- [x] Qualification impact assessed
+- [x] Documentation updated

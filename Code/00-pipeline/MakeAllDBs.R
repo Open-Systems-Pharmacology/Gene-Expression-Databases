@@ -32,12 +32,52 @@ build_bgee_lookup_tables(PATH)
 # Get gene annotation information ####
 # Human information needs to be added first,
 # is the basis for gene homology of other species
-PrepareBioMarts(SPECIE = "Human")
-for (Specie in PharmaSpecies) {
-  PrepareBioMarts(SPECIE = Specie)
+biomart_db <- file.path(PATH, "BioMarts", "All_Species_BioMarts.DB")
+expected_tables <- c(
+  paste0(ALL_SPECIE, "_Annotations"),
+  paste0(ALL_SPECIE, "_ADME")
+)
+# Compute a stable hash of the BioMart pin config
+source(paste0(PATH, "/Code/03-helpers/helper_BioMart_Pins.R"))
+biomart_pins <- get_biomart_entries()
+biomart_pin_hash <- digest::digest(biomart_pins, algo = "sha256")
+
+biomart_cache_complete <- FALSE
+stored_hash <- NULL
+
+if (file.exists(biomart_db)) {
+  biomart_conn <- DBI::dbConnect(RSQLite::SQLite(), biomart_db, synchronous = NULL)
+  on.exit(try(DBI::dbDisconnect(biomart_conn), silent = TRUE), add = TRUE)
+  existing_tables <- DBI::dbListTables(biomart_conn)
+  tables_ok <- all(expected_tables %in% existing_tables)
+  # Check for metadata table and hash
+  if ("BioMart_Metadata" %in% existing_tables) {
+    meta <- tryCatch(DBI::dbReadTable(biomart_conn, "BioMart_Metadata"), error = function(e) NULL)
+    if (!is.null(meta) && "config_hash" %in% names(meta)) {
+      stored_hash <- as.character(meta$config_hash[1])
+    }
+  }
+  biomart_cache_complete <- tables_ok && !is.null(stored_hash) && identical(stored_hash, biomart_pin_hash)
 }
-for (Specie in AnimalHealthSpecies) {
-  PrepareBioMarts(SPECIE = Specie)
+
+if (biomart_cache_complete) {
+  message("BioMart cache already complete for all species and config; skipping PrepareBioMarts().")
+} else {
+  PrepareBioMarts(SPECIE = "Human")
+  for (Specie in PharmaSpecies) {
+    PrepareBioMarts(SPECIE = Specie)
+  }
+  for (Specie in AnimalHealthSpecies) {
+    PrepareBioMarts(SPECIE = Specie)
+  }
+  # After regeneration, update the config hash in the DB
+  biomart_conn <- DBI::dbConnect(RSQLite::SQLite(), biomart_db, synchronous = NULL)
+  on.exit(try(DBI::dbDisconnect(biomart_conn), silent = TRUE), add = TRUE)
+  meta <- data.frame(config_hash = biomart_pin_hash, updated = Sys.time())
+  if ("BioMart_Metadata" %in% DBI::dbListTables(biomart_conn)) {
+    DBI::dbRemoveTable(biomart_conn, "BioMart_Metadata")
+  }
+  DBI::dbWriteTable(biomart_conn, "BioMart_Metadata", meta)
 }
 
 # make PKsimDB for pharmacological species and their ADME genes ####
